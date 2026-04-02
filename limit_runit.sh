@@ -14,10 +14,16 @@ if [ "$#" -ge  1 ]; then
                 echo $max | sudo tee /sys/class/power_supply/BAT?/charge_control_end_threshold        
 " > run
             chmod +x run
-            sudo mkdir /run/runit/service/battery-limit
-            sudo cp run /run/runit/service/battery-limit
+            sudo mkdir -p /etc/sv/battery-limit
+            sudo cp run /etc/sv/battery-limit/run
 
-            sudo systemctl enable battery-manager.service
+            # Enable the service by symlinking into the active service directory.
+            # Void Linux uses /var/service; Artix Linux uses /run/runit/service.
+            if [ -d /var/service ]; then
+                sudo ln -sf /etc/sv/battery-limit /var/service/battery-limit
+            elif [ -d /run/runit/service ]; then
+                sudo ln -sf /etc/sv/battery-limit /run/runit/service/battery-limit
+            fi
 
             echo "Done!"
 
