@@ -244,6 +244,13 @@ class BatlimitApp(tk.Tk):
             font=("TkDefaultFont", 16, "bold"),
         )
 
+        style.configure(
+            "Title.TLabel",
+            foreground="#0b3d3b",
+            background=BG_COLOR,
+            font=("TkDefaultFont", 18, "bold"),
+        )
+
     # ------------------------------------------------------------------
     # UI construction
     # ------------------------------------------------------------------
@@ -256,13 +263,13 @@ class BatlimitApp(tk.Tk):
         title_label = ttk.Label(
             self,
             text="Battery Charging Limiter",
-            font=("TkDefaultFont", 15, "bold"),
+            style="Title.TLabel",
         )
         title_label.grid(row=0, column=0, columnspan=2, pady=(main_pad, 8), padx=main_pad)
 
         subtitle_label = ttk.Label(
             self,
-            text="Set max battery charge safely",
+            text="Smart charging control for longer battery lifespan",
             style="Subtle.TLabel",
         )
         subtitle_label.grid(row=1, column=0, columnspan=2, pady=(0, 8), padx=main_pad)
@@ -350,29 +357,41 @@ class BatlimitApp(tk.Tk):
             row=0, column=3, padx=3
         )
 
-        # ── Persist checkbox ───────────────────────────────────────────
+        # ── Persist toggle (large, high-visibility) ───────────────────
         self._persist_var = tk.BooleanVar(value=False)
-        cb_text = "Persist on reboot"
-        if not persist_available:
-            cb_text += f" (unavailable – {self.init_system} not supported)"
+        self._persist_label_var = tk.StringVar(value="")
+        self._persist_available = persist_available
         self._persist_cb = tk.Checkbutton(
             self,
-            text=cb_text,
+            textvariable=self._persist_label_var,
             variable=self._persist_var,
+            command=self._update_persist_visual,
+            onvalue=True,
+            offvalue=False,
+            indicatoron=False,
             font=("TkDefaultFont", 13, "bold"),
-            bg=BG_COLOR,
-            activebackground=BG_COLOR,
+            bg="#e5e7eb",
+            activebackground="#d1d5db",
             fg=TEXT_COLOR,
-            selectcolor=BG_COLOR,
+            activeforeground=TEXT_COLOR,
+            selectcolor="#e5e7eb",
+            disabledforeground=MUTED_COLOR,
             anchor="w",
-            padx=6,
-            pady=6,
+            relief="raised",
+            bd=2,
+            highlightthickness=2,
+            highlightbackground="#d1d5db",
+            highlightcolor="#d1d5db",
+            padx=12,
+            pady=10,
         )
+        self._persist_var.trace_add("write", self._on_persist_var_change)
         if not persist_available:
             self._persist_var.set(False)
-            self._persist_cb.configure(state="disabled", disabledforeground=MUTED_COLOR)
+            self._persist_cb.configure(state="disabled")
+        self._update_persist_visual()
         self._persist_cb.grid(
-            row=7, column=0, columnspan=2, sticky="w", padx=main_pad, pady=(14, 10)
+            row=7, column=0, columnspan=2, sticky="ew", padx=main_pad, pady=(14, 10)
         )
 
         # ── Apply button ───────────────────────────────────────────────
@@ -415,6 +434,49 @@ class BatlimitApp(tk.Tk):
     def _set_limit(self, value):
         self._spin_var.set(str(value))
         self._spinbox.focus_set()
+
+    def _on_persist_var_change(self, *_args):
+        self._update_persist_visual()
+
+    def _update_persist_visual(self):
+        if not self._persist_available:
+            self._persist_label_var.set(
+                f"□ Persist on reboot (Unavailable: {self.init_system} unsupported)"
+            )
+            self._persist_cb.configure(
+                bg="#e5e7eb",
+                activebackground="#e5e7eb",
+                selectcolor="#e5e7eb",
+                relief="flat",
+                highlightbackground="#d1d5db",
+                highlightcolor="#d1d5db",
+            )
+            return
+
+        if self._persist_var.get():
+            self._persist_label_var.set("✓ Persist on reboot: ON")
+            self._persist_cb.configure(
+                bg=ACCENT_COLOR,
+                activebackground="#115e59",
+                selectcolor=ACCENT_COLOR,
+                fg="#ffffff",
+                activeforeground="#ffffff",
+                relief="sunken",
+                highlightbackground="#115e59",
+                highlightcolor="#115e59",
+            )
+        else:
+            self._persist_label_var.set("□ Persist on reboot: OFF")
+            self._persist_cb.configure(
+                bg="#e5e7eb",
+                activebackground="#d1d5db",
+                selectcolor="#e5e7eb",
+                fg=TEXT_COLOR,
+                activeforeground=TEXT_COLOR,
+                relief="raised",
+                highlightbackground="#d1d5db",
+                highlightcolor="#d1d5db",
+            )
 
     def _refresh_current(self):
         if self.threshold_path:
