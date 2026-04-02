@@ -164,6 +164,9 @@ class BatlimitApp(tk.Tk):
         self.title("Battery Charging Limiter")
         self.resizable(False, False)
 
+        # Configure custom styles
+        self._setup_styles()
+
         # Detect system capabilities at startup
         self.threshold_path = find_threshold_path()
         self.init_system = detect_init()
@@ -171,27 +174,70 @@ class BatlimitApp(tk.Tk):
         self._build_ui()
         self._refresh_current()
 
+    def _setup_styles(self):
+        """Configure custom ttk styles for better visual polish."""
+        style = ttk.Style()
+        style.theme_use("clam")
+
+        # Configure label frame style
+        style.configure(
+            "TLabelframe.Label",
+            font=("TkDefaultFont", 10, "bold"),
+        )
+
+        # Configure button style
+        style.configure(
+            "Apply.TButton",
+            font=("TkDefaultFont", 11, "bold"),
+            padding=12,
+        )
+
+        # Configure checkbox style
+        style.configure(
+            "Persist.TCheckbutton",
+            font=("TkDefaultFont", 12, "bold"),
+            padding=12,
+        )
+
     # ------------------------------------------------------------------
     # UI construction
     # ------------------------------------------------------------------
 
     def _build_ui(self):
-        pad = {"padx": 12, "pady": 5}
+        # Configure main window padding
+        main_pad = 16
 
-        # ── System info ──────────────────────────────────────────────
-        info_frame = ttk.LabelFrame(self, text="System Info")
-        info_frame.grid(row=0, column=0, columnspan=2, sticky="ew", padx=12, pady=(12, 5))
+        # ── Title ─────────────────────────────────────────────────────
+        title_label = ttk.Label(
+            self,
+            text="Battery Charging Limiter",
+            font=("TkDefaultFont", 14, "bold"),
+        )
+        title_label.grid(row=0, column=0, columnspan=2, pady=(main_pad, 8), padx=main_pad)
+
+        # ── System info ───────────────────────────────────────────────
+        info_frame = ttk.LabelFrame(self, text="System Info", padding=10)
+        info_frame.grid(
+            row=1, column=0, columnspan=2, sticky="ew", padx=main_pad, pady=8
+        )
+        info_frame.columnconfigure(1, weight=1)
 
         bat_label = self.threshold_path or "Not found – charging threshold unsupported on this machine"
         bat_color = "green" if self.threshold_path else "red"
 
-        ttk.Label(info_frame, text="Battery path:").grid(row=0, column=0, sticky="w", padx=8, pady=3)
+        ttk.Label(info_frame, text="Battery path:", font=("TkDefaultFont", 9, "bold")).grid(
+            row=0, column=0, sticky="w", pady=5
+        )
         ttk.Label(info_frame, text=bat_label, foreground=bat_color).grid(
-            row=0, column=1, sticky="w", padx=8, pady=3
+            row=0, column=1, sticky="w", padx=(8, 0), pady=5
         )
 
-        ttk.Label(info_frame, text="Init system:").grid(row=1, column=0, sticky="w", padx=8, pady=3)
-        ttk.Label(info_frame, text=self.init_system).grid(row=1, column=1, sticky="w", padx=8, pady=3)
+        ttk.Label(info_frame, text="Init system:", font=("TkDefaultFont", 9, "bold")).grid(
+            row=1, column=0, sticky="w", pady=5
+        )
+        ttk.Label(info_frame, text=self.init_system).grid(
+            row=1, column=1, sticky="w", padx=(8, 0), pady=5
+        )
 
         persist_script = PERSIST_SCRIPTS.get(self.init_system)
         persist_available = persist_script is not None and os.path.isfile(
@@ -200,46 +246,70 @@ class BatlimitApp(tk.Tk):
         persist_info = persist_script if persist_available else "not supported"
         persist_color = "green" if persist_available else "gray"
 
-        ttk.Label(info_frame, text="Persist script:").grid(row=2, column=0, sticky="w", padx=8, pady=3)
+        ttk.Label(info_frame, text="Persist script:", font=("TkDefaultFont", 9, "bold")).grid(
+            row=2, column=0, sticky="w", pady=5
+        )
         ttk.Label(info_frame, text=persist_info, foreground=persist_color).grid(
-            row=2, column=1, sticky="w", padx=8, pady=3
+            row=2, column=1, sticky="w", padx=(8, 0), pady=5
         )
 
-        # ── Current limit ────────────────────────────────────────────
-        ttk.Label(self, text="Current limit:").grid(row=1, column=0, sticky="w", **pad)
+        # ── Separator ─────────────────────────────────────────────────
+        ttk.Separator(self, orient="horizontal").grid(
+            row=2, column=0, columnspan=2, sticky="ew", padx=main_pad, pady=8
+        )
+
+        # ── Current limit ─────────────────────────────────────────────
+        ttk.Label(self, text="Current limit:", font=("TkDefaultFont", 10, "bold")).grid(
+            row=3, column=0, sticky="w", padx=main_pad, pady=(8, 2)
+        )
         self._current_var = tk.StringVar(value="—")
-        ttk.Label(self, textvariable=self._current_var, font=("", 11, "bold")).grid(
-            row=1, column=1, sticky="w", **pad
-        )
+        ttk.Label(
+            self, textvariable=self._current_var, font=("TkDefaultFont", 16, "bold"), foreground="#2E7D32"
+        ).grid(row=3, column=1, sticky="w", padx=main_pad, pady=(8, 2))
 
-        # ── New value spinbox ─────────────────────────────────────────
-        ttk.Label(self, text="New limit (%):").grid(row=2, column=0, sticky="w", **pad)
+        # ── New value spinbox ──────────────────────────────────────────
+        ttk.Label(self, text="New limit (%):", font=("TkDefaultFont", 10, "bold")).grid(
+            row=4, column=0, sticky="w", padx=main_pad, pady=(8, 2)
+        )
         self._spin_var = tk.StringVar(value="80")
         self._spinbox = ttk.Spinbox(
-            self, from_=1, to=100, textvariable=self._spin_var, width=7
+            self,
+            from_=1,
+            to=100,
+            textvariable=self._spin_var,
+            width=10,
+            font=("TkDefaultFont", 14, "bold"),
+            justify="center",
         )
-        self._spinbox.grid(row=2, column=1, sticky="w", **pad)
+        self._spinbox.grid(row=4, column=1, sticky="w", padx=main_pad, pady=(8, 2))
 
-        # ── Persist checkbox ──────────────────────────────────────────
+        # ── Persist checkbox ───────────────────────────────────────────
         self._persist_var = tk.BooleanVar(value=False)
         cb_text = "Persist on reboot"
         if not persist_available:
             cb_text += f" (unavailable – {self.init_system} not supported)"
         self._persist_cb = ttk.Checkbutton(
-            self, text=cb_text, variable=self._persist_var
+            self,
+            text=cb_text,
+            variable=self._persist_var,
+            style="Persist.TCheckbutton",
         )
         if not persist_available:
             self._persist_var.set(False)
             self._persist_cb.state(["disabled"])
-        self._persist_cb.grid(row=3, column=0, columnspan=2, sticky="w", **pad)
+        self._persist_cb.grid(
+            row=5, column=0, columnspan=2, sticky="w", padx=main_pad, pady=(16, 12)
+        )
 
-        # ── Apply button ──────────────────────────────────────────────
-        self._apply_btn = ttk.Button(self, text="Apply", command=self._on_apply)
+        # ── Apply button ───────────────────────────────────────────────
+        self._apply_btn = ttk.Button(
+            self, text="Apply", command=self._on_apply, style="Apply.TButton"
+        )
         if not self.threshold_path:
             self._apply_btn.state(["disabled"])
-        self._apply_btn.grid(row=4, column=0, columnspan=2, pady=(8, 4))
+        self._apply_btn.grid(row=6, column=0, columnspan=2, pady=12, sticky="ew", padx=main_pad)
 
-        # ── Status bar ────────────────────────────────────────────────
+        # ── Status bar ─────────────────────────────────────────────────
         self._status_var = tk.StringVar(value="Ready.")
         self._status_label = ttk.Label(
             self,
@@ -247,8 +317,11 @@ class BatlimitApp(tk.Tk):
             foreground="gray",
             wraplength=380,
             justify="left",
+            font=("TkDefaultFont", 9),
         )
-        self._status_label.grid(row=5, column=0, columnspan=2, sticky="ew", padx=12, pady=(0, 12))
+        self._status_label.grid(
+            row=7, column=0, columnspan=2, sticky="ew", padx=main_pad, pady=(0, main_pad)
+        )
 
     # ------------------------------------------------------------------
     # Event handlers

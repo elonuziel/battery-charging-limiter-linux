@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Battery Charging Limiter
+Comment=Set battery charging thresholds on Linux (ASUS Laptops)
+Exec=python3 /home/elon/Documents/GitHub/battery-charging-limiter-linux/batlimit_gui.py
+Icon=battery
+Terminal=false
+Categories=System;Utility;
+Keywords=battery;charging;limiter;asus;
