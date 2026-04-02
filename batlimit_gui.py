@@ -44,6 +44,13 @@ ONESHOT_SCRIPT = "limit.sh"
 PKEXEC_DISMISSED = 126
 PKEXEC_NOT_AUTHORIZED = 127
 
+# UI colors
+BG_COLOR = "#f4f6f8"
+CARD_BG = "#ffffff"
+TEXT_COLOR = "#1f2933"
+MUTED_COLOR = "#6b7280"
+ACCENT_COLOR = "#0f766e"
+
 # ---------------------------------------------------------------------------
 # System detection helpers
 # ---------------------------------------------------------------------------
@@ -163,6 +170,7 @@ class BatlimitApp(tk.Tk):
         super().__init__()
         self.title("Battery Charging Limiter")
         self.resizable(False, False)
+        self.configure(bg=BG_COLOR)
 
         # Configure custom styles
         self._setup_styles()
@@ -173,16 +181,33 @@ class BatlimitApp(tk.Tk):
 
         self._build_ui()
         self._refresh_current()
+        self.bind("<Return>", lambda _event: self._on_apply())
 
     def _setup_styles(self):
         """Configure custom ttk styles for better visual polish."""
         style = ttk.Style()
         style.theme_use("clam")
+        style.configure(".", background=BG_COLOR)
+        style.configure("TLabel", background=BG_COLOR, foreground=TEXT_COLOR)
 
         # Configure label frame style
         style.configure(
             "TLabelframe.Label",
             font=("TkDefaultFont", 10, "bold"),
+            foreground=TEXT_COLOR,
+            background=BG_COLOR,
+        )
+        style.configure(
+            "Card.TLabelframe",
+            background=CARD_BG,
+            borderwidth=1,
+            relief="solid",
+        )
+        style.configure(
+            "Card.TLabelframe.Label",
+            font=("TkDefaultFont", 10, "bold"),
+            foreground=TEXT_COLOR,
+            background=BG_COLOR,
         )
 
         # Configure button style
@@ -190,13 +215,33 @@ class BatlimitApp(tk.Tk):
             "Apply.TButton",
             font=("TkDefaultFont", 11, "bold"),
             padding=12,
+            background=ACCENT_COLOR,
+            foreground="#ffffff",
+        )
+        style.map(
+            "Apply.TButton",
+            background=[("active", "#115e59"), ("disabled", "#9ca3af")],
+            foreground=[("disabled", "#f3f4f6")],
         )
 
-        # Configure checkbox style
         style.configure(
-            "Persist.TCheckbutton",
-            font=("TkDefaultFont", 12, "bold"),
-            padding=12,
+            "Preset.TButton",
+            font=("TkDefaultFont", 10, "bold"),
+            padding=6,
+        )
+
+        style.configure(
+            "Subtle.TLabel",
+            foreground=MUTED_COLOR,
+            background=BG_COLOR,
+            font=("TkDefaultFont", 9),
+        )
+
+        style.configure(
+            "Value.TLabel",
+            foreground="#166534",
+            background=BG_COLOR,
+            font=("TkDefaultFont", 16, "bold"),
         )
 
     # ------------------------------------------------------------------
@@ -211,19 +256,26 @@ class BatlimitApp(tk.Tk):
         title_label = ttk.Label(
             self,
             text="Battery Charging Limiter",
-            font=("TkDefaultFont", 14, "bold"),
+            font=("TkDefaultFont", 15, "bold"),
         )
         title_label.grid(row=0, column=0, columnspan=2, pady=(main_pad, 8), padx=main_pad)
 
+        subtitle_label = ttk.Label(
+            self,
+            text="Set max battery charge safely",
+            style="Subtle.TLabel",
+        )
+        subtitle_label.grid(row=1, column=0, columnspan=2, pady=(0, 8), padx=main_pad)
+
         # ── System info ───────────────────────────────────────────────
-        info_frame = ttk.LabelFrame(self, text="System Info", padding=10)
+        info_frame = ttk.LabelFrame(self, text="System Info", padding=10, style="Card.TLabelframe")
         info_frame.grid(
-            row=1, column=0, columnspan=2, sticky="ew", padx=main_pad, pady=8
+            row=2, column=0, columnspan=2, sticky="ew", padx=main_pad, pady=8
         )
         info_frame.columnconfigure(1, weight=1)
 
         bat_label = self.threshold_path or "Not found – charging threshold unsupported on this machine"
-        bat_color = "green" if self.threshold_path else "red"
+        bat_color = "#15803d" if self.threshold_path else "#b91c1c"
 
         ttk.Label(info_frame, text="Battery path:", font=("TkDefaultFont", 9, "bold")).grid(
             row=0, column=0, sticky="w", pady=5
@@ -244,7 +296,7 @@ class BatlimitApp(tk.Tk):
             os.path.join(SCRIPT_DIR, persist_script)
         )
         persist_info = persist_script if persist_available else "not supported"
-        persist_color = "green" if persist_available else "gray"
+        persist_color = "#15803d" if persist_available else MUTED_COLOR
 
         ttk.Label(info_frame, text="Persist script:", font=("TkDefaultFont", 9, "bold")).grid(
             row=2, column=0, sticky="w", pady=5
@@ -255,21 +307,21 @@ class BatlimitApp(tk.Tk):
 
         # ── Separator ─────────────────────────────────────────────────
         ttk.Separator(self, orient="horizontal").grid(
-            row=2, column=0, columnspan=2, sticky="ew", padx=main_pad, pady=8
+            row=3, column=0, columnspan=2, sticky="ew", padx=main_pad, pady=8
         )
 
         # ── Current limit ─────────────────────────────────────────────
         ttk.Label(self, text="Current limit:", font=("TkDefaultFont", 10, "bold")).grid(
-            row=3, column=0, sticky="w", padx=main_pad, pady=(8, 2)
+            row=4, column=0, sticky="w", padx=main_pad, pady=(8, 2)
         )
         self._current_var = tk.StringVar(value="—")
         ttk.Label(
-            self, textvariable=self._current_var, font=("TkDefaultFont", 16, "bold"), foreground="#2E7D32"
-        ).grid(row=3, column=1, sticky="w", padx=main_pad, pady=(8, 2))
+            self, textvariable=self._current_var, style="Value.TLabel"
+        ).grid(row=4, column=1, sticky="w", padx=main_pad, pady=(8, 2))
 
         # ── New value spinbox ──────────────────────────────────────────
         ttk.Label(self, text="New limit (%):", font=("TkDefaultFont", 10, "bold")).grid(
-            row=4, column=0, sticky="w", padx=main_pad, pady=(8, 2)
+            row=5, column=0, sticky="w", padx=main_pad, pady=(8, 2)
         )
         self._spin_var = tk.StringVar(value="80")
         self._spinbox = ttk.Spinbox(
@@ -280,25 +332,47 @@ class BatlimitApp(tk.Tk):
             width=10,
             font=("TkDefaultFont", 14, "bold"),
             justify="center",
+            validate="key",
+            validatecommand=(self.register(self._validate_spin_input), "%P"),
         )
-        self._spinbox.grid(row=4, column=1, sticky="w", padx=main_pad, pady=(8, 2))
+        self._spinbox.grid(row=5, column=1, sticky="w", padx=main_pad, pady=(8, 2))
+
+        presets = ttk.Frame(self)
+        presets.grid(row=6, column=0, columnspan=2, sticky="w", padx=main_pad, pady=(6, 2))
+        ttk.Label(presets, text="Quick presets:", style="Subtle.TLabel").grid(row=0, column=0, padx=(0, 6))
+        ttk.Button(presets, text="60%", style="Preset.TButton", command=lambda: self._set_limit(60)).grid(
+            row=0, column=1, padx=3
+        )
+        ttk.Button(presets, text="80%", style="Preset.TButton", command=lambda: self._set_limit(80)).grid(
+            row=0, column=2, padx=3
+        )
+        ttk.Button(presets, text="100%", style="Preset.TButton", command=lambda: self._set_limit(100)).grid(
+            row=0, column=3, padx=3
+        )
 
         # ── Persist checkbox ───────────────────────────────────────────
         self._persist_var = tk.BooleanVar(value=False)
         cb_text = "Persist on reboot"
         if not persist_available:
             cb_text += f" (unavailable – {self.init_system} not supported)"
-        self._persist_cb = ttk.Checkbutton(
+        self._persist_cb = tk.Checkbutton(
             self,
             text=cb_text,
             variable=self._persist_var,
-            style="Persist.TCheckbutton",
+            font=("TkDefaultFont", 13, "bold"),
+            bg=BG_COLOR,
+            activebackground=BG_COLOR,
+            fg=TEXT_COLOR,
+            selectcolor=BG_COLOR,
+            anchor="w",
+            padx=6,
+            pady=6,
         )
         if not persist_available:
             self._persist_var.set(False)
-            self._persist_cb.state(["disabled"])
+            self._persist_cb.configure(state="disabled", disabledforeground=MUTED_COLOR)
         self._persist_cb.grid(
-            row=5, column=0, columnspan=2, sticky="w", padx=main_pad, pady=(16, 12)
+            row=7, column=0, columnspan=2, sticky="w", padx=main_pad, pady=(14, 10)
         )
 
         # ── Apply button ───────────────────────────────────────────────
@@ -307,25 +381,40 @@ class BatlimitApp(tk.Tk):
         )
         if not self.threshold_path:
             self._apply_btn.state(["disabled"])
-        self._apply_btn.grid(row=6, column=0, columnspan=2, pady=12, sticky="ew", padx=main_pad)
+        self._apply_btn.grid(row=8, column=0, columnspan=2, pady=10, sticky="ew", padx=main_pad)
+
+        ttk.Label(
+            self,
+            text="Tip: press Enter to apply",
+            style="Subtle.TLabel",
+        ).grid(row=9, column=0, columnspan=2, sticky="w", padx=main_pad, pady=(0, 6))
 
         # ── Status bar ─────────────────────────────────────────────────
         self._status_var = tk.StringVar(value="Ready.")
         self._status_label = ttk.Label(
             self,
             textvariable=self._status_var,
-            foreground="gray",
-            wraplength=380,
+            foreground=MUTED_COLOR,
+            wraplength=430,
             justify="left",
             font=("TkDefaultFont", 9),
         )
         self._status_label.grid(
-            row=7, column=0, columnspan=2, sticky="ew", padx=main_pad, pady=(0, main_pad)
+            row=10, column=0, columnspan=2, sticky="ew", padx=main_pad, pady=(0, main_pad)
         )
 
     # ------------------------------------------------------------------
     # Event handlers
     # ------------------------------------------------------------------
+
+    def _validate_spin_input(self, value):
+        if value == "":
+            return True
+        return value.isdigit() and len(value) <= 3
+
+    def _set_limit(self, value):
+        self._spin_var.set(str(value))
+        self._spinbox.focus_set()
 
     def _refresh_current(self):
         if self.threshold_path:
