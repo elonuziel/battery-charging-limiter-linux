@@ -11,7 +11,8 @@ if [ "$#" -ge  1 ]; then
 			echo $max | sudo tee /sys/class/power_supply/BAT?/charge_control_end_threshold > /dev/null
             cd /tmp
             echo "#!/bin/bash
-                echo $max | sudo tee /sys/class/power_supply/BAT?/charge_control_end_threshold        
+                echo $max > /sys/class/power_supply/BAT?/charge_control_end_threshold
+                exec sleep infinity
 " > run
             chmod +x run
             sudo mkdir -p /etc/sv/battery-limit
