@@ -1,63 +1,78 @@
-# Battery Charging limiter Linux (ASUS Laptops)
+# Battery Charging Limiter for Linux (ASUS & Supported Laptops)
 
-When the laptop is being constantly used with a charger plugged in it is better to limit the charging at 60% to 80% to improve the battery health.
-Many laptop vendors like Asus provide software utility to set the battery max charge threshold but it works only in windows.
+A simple yet elegant Linux application (GUI & CLI) to control battery charging limit thresholds (e.g. 60%, 80%, or 100%) and prolong laptop battery lifespan. Supports **reboot persistence** via systemd.
 
-With Linux kernel 5.4 added the ability to set a battery charge threshold for many Asus laptops this script uses it to set the limit.
+![Battery Charge Limiter GUI](battery-limiter.desktop)
 
-## Usage
-Run the script limit.sh with max battery threshold as an argument
+---
 
-`eg: ./limit.sh 60`
+## 🌟 Why Limit Battery Charging?
 
-*prompt to enter the password since it needs sudo permission*
+When a laptop is continuously plugged into AC power, keeping the battery at 100% capacity accelerates chemical degradation due to high voltage stress and thermal build-up. 
 
-Will set the battery threshold to 60% so even if the laptop is plugged in it won't charge beyond 60% helps to protect the battery health.
+Limiting the maximum charge threshold extends total battery health and longevity:
+- 🌿 **60% (Maximum Lifespan)**: Ideal if your laptop is continuously connected to a charger at a desk or office.
+- ⚖️ **80% (Daily Balance - Recommended)**: Best balance between long battery life and mobile usage time.
+- ✈️ **100% (Full Capacity)**: For travel, long flights, or extended off-grid work.
 
-*Note: limit.sh set limit won't persist on system reboot*
+---
 
-or 
+## 🚀 Quick Start & Installation
 
-For operating systems with systemd use other script limitd.sh that will create a systemd service to apply the limit on system reboot.
+### 1. Graphical App (GUI)
+Run the simple installer to set executable permissions and add **Battery Charge Limiter** to your application menu:
 
-`eg: ./limitd.sh 60`
+```bash
+chmod +x install.sh
+./install.sh
+```
 
-*limitd.sh set limit will persist on system reboot*
+You can launch it from your desktop app menu or run directly:
+```bash
+python3 battery_limiter_gui.py
+```
 
-Or if you use Runit instead of systemd, use limit_runit.sh
+Features:
+- Live battery level, charging status, and active limit display
+- Visual recommendation cards (60%, 80%, 100%) and fine slider control
+- Graphical password prompt (via `pkexec`) to set thresholds and enable systemd persistence automatically
 
-`eg: ./limit_runit.sh 60`
+---
 
-Reboot the system and check if limit works
+### 2. Command Line (CLI) & Persistence
 
-#### Renable full capacity 
+#### Check Current Status
+```bash
+./battery_limiter_backend.py info
+```
 
-Run the limit.sh script with 100%
+#### Set Threshold & Persist on Reboot
+To set limit to 80% (persisted on system reboots, sleep, and hibernate):
+```bash
+sudo ./battery_limiter_backend.py set 80
+```
 
-`./limit.sh 100`
+Or using legacy scripts:
+- `./limitd.sh 80` (Systemd persistence)
+- `./limit_runit.sh 80` (Runit persistence)
+- `./limitrc.sh 80` (OpenRC persistence)
 
-or
+---
 
-`./limitd.sh 100 `
+## ⚙️ How It Works
 
-This will persist the change on reboot if systemd is available
+Modern Linux kernels (5.4+) expose battery charge thresholds via sysfs:
+`/sys/class/power_supply/BAT0/charge_control_end_threshold`
 
-Or use 'limit_runit.sh' for Runit.
+When you apply a limit in the app or CLI:
+1. Writes the selected percentage to `charge_control_end_threshold`.
+2. Creates and enables `/etc/systemd/system/battery-manager.service` so your choice is automatically restored after reboot or system suspend.
 
-`./limit_runit.sh 100`
+---
 
-Note: make the scripts executable before running by executing 
-`eg: chmod +x limit.sh`
+## 📋 Compatibility
 
-
-## More info
-* [ASUS Battery Information Center](https://www.asus.com/support/FAQ/1038475/)
-* [Arch Wiki](https://wiki.archlinux.org/index.php/Laptop/ASUS#Battery_charge_threshold)
-
-
------
->Tested with :
-> - Asus vivobook 15 with AMD Ryzen 3500U running Linux mint 20 (Kernel: 5.8.0-25-generic);
-> - Asus Vivobook 15 PRO OLED Ryzen5900 M3500 using artix-linux (Kernel: 5.3.1);
-> - Asus TUF Gaming F15 using Debian 12;
-> - Asus ExpertBook B5 OLED B5302CEA using Fedora (Workstation Edition) 39 (Kernel: Linux 6.6.9-200.fc39.x86_64);
+Tested and verified on Linux systems supporting sysfs battery thresholds:
+- Asus Vivobook / Zenbook / ROG / TUF Gaming series
+- Lenovo ThinkPad series
+- Systems running Linux Kernel 5.4+ with systemd, runit, or openrc
