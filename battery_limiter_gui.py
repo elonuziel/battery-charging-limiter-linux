@@ -431,23 +431,36 @@ class BatteryLimiterApp(Gtk.Window):
         GLib.timeout_add(800, self.refresh_status)
 
     def _apply_limit(self, target):
-        """Try all available auth strategies in order."""
+        """Try all available auth strategies in order.
+        Always prefer the root helper (pkexec) so the systemd service
+        is created for reboot persistence alongside the sysfs write.
+        """
         info = battery_limiter_backend.get_battery_info()
 
-        # 1. Direct write (root or udev plugdev rule active)
-        if info.get("is_root") or info.get("can_write_direct"):
+        # 1. Root helper via pkexec — does sysfs write + systemd persistence in one shot
+        if info.get("helper_installed"):
+            result = self._try_pkexec_helper(target)
+            if result[0] or result[1] == "Authentication cancelled.":
+                return result
+            # pkexec failed for a non-cancel reason, fall through
+
+        # 2. If running as root already, write directly
+        if info.get("is_root"):
             return battery_limiter_backend.apply_limit(target)
 
-        # 2. Shell helper via pkexec (most reliable with polkit GUI dialog)
-        if info.get("helper_installed"):
-            return self._try_pkexec_helper(target)
+        # 3. Direct write (udev plugdev rule active) — no persistence
+        if info.get("can_write_direct"):
+            ok, msg = battery_limiter_backend.apply_limit(target)
+            if ok:
+                msg += "\n⚠️ Reboot persistence could not be set (run 'sudo ./install.sh' once to enable it)."
+            return ok, msg
 
-        # 3. pkexec python backend (fallback, may fail on some systems)
+        # 4. pkexec python backend (fallback)
         result = self._try_pkexec_python(target)
         if result[0]:
             return result
 
-        # 4. Open terminal with sudo as last resort
+        # 5. Terminal sudo as last resort
         return self._try_terminal_sudo(target)
 
     def _try_pkexec_helper(self, target):
