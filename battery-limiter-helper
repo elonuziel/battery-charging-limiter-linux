@@ -1,0 +1,56 @@
+#!/bin/bash
+# battery-limiter-helper - Root helper script for setting charge thresholds
+# Called by pkexec with the battery-limiter polkit policy
+# Usage: battery-limiter-helper set <limit>
+
+set -e
+
+LIMIT="$2"
+CMD="$1"
+
+if [[ "$CMD" != "set" ]]; then
+    echo "Usage: battery-limiter-helper set <limit>" >&2
+    exit 1
+fi
+
+if ! [[ "$LIMIT" =~ ^[0-9]+$ ]] || [ "$LIMIT" -lt 20 ] || [ "$LIMIT" -gt 100 ]; then
+    echo "Error: Limit must be a number between 20 and 100" >&2
+    exit 1
+fi
+
+SYSTEMD_SERVICE="/etc/systemd/system/battery-manager.service"
+APPLIED=0
+
+# Apply to all battery threshold files
+for THRESH_FILE in /sys/class/power_supply/BAT*/charge_control_end_threshold; do
+    if [ -f "$THRESH_FILE" ]; then
+        echo "$LIMIT" > "$THRESH_FILE"
+        echo "Applied limit $LIMIT% to $THRESH_FILE"
+        APPLIED=$((APPLIED + 1))
+    fi
+done
+
+if [ "$APPLIED" -eq 0 ]; then
+    echo "Error: No battery charge_control_end_threshold found in sysfs." >&2
+    exit 1
+fi
+
+# Write systemd service for reboot persistence
+cat > "$SYSTEMD_SERVICE" << EOF
+[Unit]
+Description=Set battery charge threshold on boot and resume
+After=multi-user.target suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c 'for f in /sys/class/power_supply/BAT*/charge_control_end_threshold; do echo $LIMIT > "\$f"; done'
+
+[Install]
+WantedBy=multi-user.target suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target
+EOF
+
+systemctl daemon-reload
+systemctl enable battery-manager.service
+systemctl start battery-manager.service 2>/dev/null || true
+
+echo "Successfully set charge limit to ${LIMIT}% and enabled systemd reboot persistence!"

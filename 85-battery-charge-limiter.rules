@@ -1,0 +1,8 @@
+# Battery Charge Limiter - udev rule for ASUS UX331UA and compatible laptops
+# Grants the 'plugdev' group write access to the battery charge threshold sysfs node.
+# This enables passwordless charging limit changes for users in the plugdev group.
+# Runs on every boot/resume when the battery device is registered.
+
+SUBSYSTEM=="power_supply", KERNEL=="BAT[0-9]", ATTR{type}=="Battery", \
+  RUN+="/bin/chmod g+w /sys%p/charge_control_end_threshold", \
+  RUN+="/bin/chgrp plugdev /sys%p/charge_control_end_threshold"

@@ -1,55 +1,92 @@
 #!/usr/bin/env bash
+# Battery Charge Limiter - Installer
+# Must be run with sudo: sudo ./install.sh
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-DESKTOP_MENU_DIR="$HOME/.local/share/applications"
-DESKTOP_DIR="$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")"
-SUDOERS_FILE="/etc/sudoers.d/battery-limiter"
+REAL_USER="${SUDO_USER:-$USER}"
+REAL_HOME=$(eval echo "~$REAL_USER")
+DESKTOP_DIR="$(sudo -u "$REAL_USER" xdg-user-dir DESKTOP 2>/dev/null || echo "$REAL_HOME/Desktop")"
 
-echo "Installing Battery Charge Limiter..."
+echo "═══════════════════════════════════════════════════"
+echo " Battery Charge Limiter Installer"
+echo " ASUS UX331UA / Ubuntu 26.04"
+echo "═══════════════════════════════════════════════════"
 
-# Ensure executable permissions
+# ── 1. Ensure scripts are executable ────────────────────────────────────────
 chmod +x "$SCRIPT_DIR/battery_limiter_gui.py"
 chmod +x "$SCRIPT_DIR/battery_limiter_backend.py"
+chmod +x "$SCRIPT_DIR/battery-limiter-helper"
 chmod +x "$SCRIPT_DIR/limit.sh"
 chmod +x "$SCRIPT_DIR/limitd.sh"
+echo "✓ Script permissions set"
 
-DESKTOP_ENTRY="[Desktop Entry]
+# ── 2. Install shell helper to system path (needed by pkexec polkit policy) ─
+install -m 755 "$SCRIPT_DIR/battery-limiter-helper" /usr/local/bin/battery-limiter-helper
+echo "✓ Installed helper to /usr/local/bin/battery-limiter-helper"
+
+# ── 3. Install polkit policy ─────────────────────────────────────────────────
+install -m 644 "$SCRIPT_DIR/com.battery.limiter.policy" /usr/share/polkit-1/actions/
+echo "✓ Installed polkit policy"
+
+# ── 4. Install udev rule (grants plugdev group write access at boot) ─────────
+install -m 644 "$SCRIPT_DIR/85-battery-charge-limiter.rules" /etc/udev/rules.d/
+udevadm control --reload-rules
+udevadm trigger --subsystem-match=power_supply --action=change
+echo "✓ Installed udev rule and reloaded"
+
+# ── 5. Apply immediately without waiting for reboot ──────────────────────────
+sleep 1
+for THRESH_FILE in /sys/class/power_supply/BAT*/charge_control_end_threshold; do
+    if [ -f "$THRESH_FILE" ]; then
+        chmod g+w "$THRESH_FILE"
+        chgrp plugdev "$THRESH_FILE"
+        echo "✓ Applied plugdev group write access to $THRESH_FILE"
+    fi
+done
+
+# ── 6. Install desktop menu entry ────────────────────────────────────────────
+DESKTOP_MENU_DIR="$REAL_HOME/.local/share/applications"
+mkdir -p "$DESKTOP_MENU_DIR"
+cat > "$DESKTOP_MENU_DIR/battery-limiter.desktop" << EOF
+[Desktop Entry]
 Name=Battery Charge Limiter
 Comment=Protect laptop battery health by setting custom charge limit thresholds
-Exec=/usr/bin/env python3 $SCRIPT_DIR/battery_limiter_gui.py
+Exec=/usr/bin/python3 $SCRIPT_DIR/battery_limiter_gui.py
 Icon=battery-good-charging
 Terminal=false
 Type=Application
 Categories=Settings;HardwareSettings;System;GTK;
 Keywords=battery;charge;limit;threshold;asus;laptop;health;
-"
-
-# 1. Install to Application Menu
-mkdir -p "$DESKTOP_MENU_DIR"
-echo "$DESKTOP_ENTRY" > "$DESKTOP_MENU_DIR/battery-limiter.desktop"
+EOF
+chown "$REAL_USER:$REAL_USER" "$DESKTOP_MENU_DIR/battery-limiter.desktop"
 chmod +x "$DESKTOP_MENU_DIR/battery-limiter.desktop"
+echo "✓ Installed application menu entry"
 
-# 2. Install Shortcut on User Desktop
+# ── 7. Install desktop shortcut ──────────────────────────────────────────────
 if [ -d "$DESKTOP_DIR" ]; then
-    echo "$DESKTOP_ENTRY" > "$DESKTOP_DIR/battery-limiter.desktop"
+    cat > "$DESKTOP_DIR/battery-limiter.desktop" << EOF
+[Desktop Entry]
+Name=Battery Charge Limiter
+Comment=Protect laptop battery health by setting custom charge limit thresholds
+Exec=/usr/bin/python3 $SCRIPT_DIR/battery_limiter_gui.py
+Icon=battery-good-charging
+Terminal=false
+Type=Application
+Categories=Settings;HardwareSettings;System;GTK;
+Keywords=battery;charge;limit;threshold;asus;laptop;health;
+EOF
+    chown "$REAL_USER:$REAL_USER" "$DESKTOP_DIR/battery-limiter.desktop"
     chmod +x "$DESKTOP_DIR/battery-limiter.desktop"
-    if command -v gio &> /dev/null; then
-        gio set "$DESKTOP_DIR/battery-limiter.desktop" metadata::trusted true 2>/dev/null || true
-    fi
-    echo "✓ Created desktop shortcut at: $DESKTOP_DIR/battery-limiter.desktop"
+    sudo -u "$REAL_USER" gio set "$DESKTOP_DIR/battery-limiter.desktop" metadata::trusted true 2>/dev/null || true
+    echo "✓ Created Desktop shortcut: $DESKTOP_DIR/battery-limiter.desktop"
 fi
 
-# 3. Setup Sudoers Rule for seamless execution if run as root/sudo
-if [ "$EUID" -eq 0 ]; then
-    REAL_USER="${SUDO_USER:-$USER}"
-    echo "$REAL_USER ALL=(ALL) NOPASSWD: $SCRIPT_DIR/battery_limiter_backend.py set *" > "$SUDOERS_FILE"
-    chmod 0440 "$SUDOERS_FILE"
-    echo "✓ Configured sudoers rule in $SUDOERS_FILE for seamless threshold changes!"
-else
-    echo "ℹ Note: Run 'sudo ./install.sh' to enable passwordless limit setting for the GUI!"
-fi
-
-echo "✓ Battery Charge Limiter installed successfully!"
-echo "Launch from your desktop shortcut, application menu, or run:"
-echo "  python3 $SCRIPT_DIR/battery_limiter_gui.py"
+echo ""
+echo "═══════════════════════════════════════════════════"
+echo " ✅ Installation complete!"
+echo ""
+echo " You can now use the app WITHOUT a password."
+echo " Launch it from your Desktop icon or run:"
+echo "   python3 $SCRIPT_DIR/battery_limiter_gui.py"
+echo "═══════════════════════════════════════════════════"
