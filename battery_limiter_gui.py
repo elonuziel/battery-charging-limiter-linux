@@ -116,6 +116,20 @@ window.main-window {
     background: linear-gradient(135deg, #b4befe, #89b4fa);
 }
 
+.btn-secondary {
+    background-color: #313244;
+    color: #cdd6f4;
+    font-weight: 600;
+    font-size: 13px;
+    border-radius: 8px;
+    padding: 6px 14px;
+    border: none;
+}
+
+.btn-secondary:hover {
+    background-color: #45475a;
+}
+
 .notification-box {
     border-radius: 10px;
     padding: 10px 14px;
@@ -135,10 +149,40 @@ window.main-window {
 }
 """
 
+def create_desktop_shortcut():
+    """Creates a launcher shortcut on the user's Desktop directory."""
+    home = os.path.expanduser("~")
+    desktop_dir = os.path.join(home, "Desktop")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    gui_script = os.path.join(script_dir, "battery_limiter_gui.py")
+
+    content = f"""[Desktop Entry]
+Name=Battery Charge Limiter
+Comment=Protect laptop battery health by setting custom charge limit thresholds
+Exec=/usr/bin/env python3 {gui_script}
+Icon=battery-good-charging
+Terminal=false
+Type=Application
+Categories=Settings;HardwareSettings;System;GTK;
+Keywords=battery;charge;limit;threshold;asus;laptop;health;
+"""
+    if os.path.exists(desktop_dir):
+        target_path = os.path.join(desktop_dir, "battery-limiter.desktop")
+        try:
+            with open(target_path, "w") as f:
+                f.write(content)
+            os.chmod(target_path, 0o755)
+            # Mark trusted if gio is available
+            subprocess.run(["gio", "set", target_path, "metadata::trusted", "true"], check=False)
+            return True, target_path
+        except Exception as e:
+            return False, str(e)
+    return False, "Desktop directory not found"
+
 class BatteryLimiterApp(Gtk.Window):
     def __init__(self):
         super().__init__(title="Battery Charge Limiter")
-        self.set_default_size(540, 680)
+        self.set_default_size(540, 720)
         self.set_position(Gtk.WindowPosition.CENTER)
         self.get_style_context().add_class("main-window")
 
@@ -168,8 +212,10 @@ class BatteryLimiterApp(Gtk.Window):
         main_vbox.set_margin_right(24)
         self.add(main_vbox)
 
-        # 1. Header
-        header_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        # 1. Header with Desktop Shortcut Button
+        header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        
+        header_text_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         title_lbl = Gtk.Label(label="⚡ Battery Charge Limiter", xalign=0)
         title_lbl.get_style_context().add_class("header-title")
         subtitle_lbl = Gtk.Label(
@@ -177,8 +223,15 @@ class BatteryLimiterApp(Gtk.Window):
             xalign=0
         )
         subtitle_lbl.get_style_context().add_class("header-subtitle")
-        header_box.pack_start(title_lbl, False, False, 0)
-        header_box.pack_start(subtitle_lbl, False, False, 0)
+        header_text_box.pack_start(title_lbl, False, False, 0)
+        header_text_box.pack_start(subtitle_lbl, False, False, 0)
+
+        shortcut_btn = Gtk.Button(label="📌 Desktop Shortcut")
+        shortcut_btn.get_style_context().add_class("btn-secondary")
+        shortcut_btn.connect("clicked", self.on_create_shortcut_clicked)
+
+        header_box.pack_start(header_text_box, True, True, 0)
+        header_box.pack_end(shortcut_btn, False, False, 0)
         main_vbox.pack_start(header_box, False, False, 0)
 
         # 2. Live Battery Dashboard Card
@@ -369,6 +422,13 @@ class BatteryLimiterApp(Gtk.Window):
             ctx.remove_class("notification-success")
             ctx.add_class("notification-error")
         self.notification_box.show_all()
+
+    def on_create_shortcut_clicked(self, btn):
+        ok, res = create_desktop_shortcut()
+        if ok:
+            self.show_notification(f"Desktop shortcut created: {res}", True)
+        else:
+            self.show_notification(f"Could not create desktop shortcut: {res}", False)
 
     def on_apply_clicked(self, btn):
         target = self.selected_target
