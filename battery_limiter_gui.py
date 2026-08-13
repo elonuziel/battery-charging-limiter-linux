@@ -8,6 +8,7 @@ import sys
 import os
 import subprocess
 import json
+import time
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -209,8 +210,8 @@ class BatteryLimiterApp(Gtk.Window):
         self.build_ui()
         self.refresh_status()
 
-        # Auto refresh status every 5 seconds
-        GLib.timeout_add_seconds(5, self.refresh_status)
+        # Auto refresh status every 3 seconds
+        GLib.timeout_add_seconds(3, self.refresh_status)
 
     def build_ui(self):
         main_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
@@ -272,7 +273,7 @@ class BatteryLimiterApp(Gtk.Window):
         grid.attach(self.cap_val_lbl, 0, 1, 1, 1)
 
         # Active Limit
-        lbl2 = Gtk.Label(label="Active Threshold Limit", xalign=0)
+        lbl2 = Gtk.Label(label="Active Hardware Limit", xalign=0)
         lbl2.get_style_context().add_class("header-subtitle")
         self.thresh_val_lbl = Gtk.Label(label="-- %", xalign=0)
         self.thresh_val_lbl.get_style_context().add_class("status-value")
@@ -302,7 +303,7 @@ class BatteryLimiterApp(Gtk.Window):
         note_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         note_box.get_style_context().add_class("info-note")
         self.note_lbl = Gtk.Label(
-            label="💡 Note: If your current battery (e.g. 98%) is above your chosen limit (e.g. 60%), hardware charging stops immediately. The battery will slowly drain down to 60% and stay there.",
+            label="💡 Tip: Run 'sudo ./limitd.sh <limit>' or 'sudo ./install.sh' in your terminal if authorization is required.",
             xalign=0
         )
         self.note_lbl.set_line_wrap(True)
@@ -402,10 +403,14 @@ class BatteryLimiterApp(Gtk.Window):
 
         self.status_val_lbl.set_text(stat)
 
-        if cap is not None and thresh is not None and cap > thresh:
+        if cap is not None and thresh is not None and cap >= thresh and thresh < 100:
             self.note_lbl.set_text(
-                f"💡 Note: Your battery ({cap}%) is currently above your set limit ({thresh}%). "
-                f"Charging is active hardware-blocked! Battery will slowly drain down to {thresh}% and hold."
+                f"⚡ Hardware Limit Active ({thresh}%): Your battery level ({cap}%) is at/above the limit. "
+                f"Charging is hardware-stopped! Battery will discharge or hold at {thresh}%."
+            )
+        elif cap is not None and thresh is not None:
+            self.note_lbl.set_text(
+                f"⚡ Hardware Limit Active ({thresh}%): Battery will stop charging once it reaches {thresh}%."
             )
 
         if svc:
@@ -470,22 +475,33 @@ class BatteryLimiterApp(Gtk.Window):
                     success = True
                     msg = res.stdout.strip() or f"Successfully set charge limit to {target}%!"
                 else:
-                    # 2. Fall back to pkexec (Graphical Password Prompt)
+                    # 2. Try pkexec (Graphical Password Dialog)
+                    env = os.environ.copy()
                     cmd_pkexec = ["pkexec", sys.executable, backend_script, "set", str(target)]
-                    res_pk = subprocess.run(cmd_pkexec, capture_output=True, text=True)
+                    res_pk = subprocess.run(cmd_pkexec, capture_output=True, text=True, env=env)
                     if res_pk.returncode == 0:
                         success = True
                         msg = res_pk.stdout.strip() or f"Successfully set charge limit to {target}%!"
                     else:
-                        success = False
-                        err_out = res_pk.stderr.strip() or res_pk.stdout.strip()
-                        msg = f"Authentication required: {err_out}\nRun 'sudo ./install.sh' to enable one-click passwordless limit changes!"
+                        # 3. Fallback: Launch terminal password prompt
+                        term_cmd = [
+                            "x-terminal-emulator", "-e",
+                            f"bash -c 'echo Requesting root permissions to set battery limit to {target}%...; sudo {sys.executable} {backend_script} set {target}; echo Press enter to close...; read'"
+                        ]
+                        try:
+                            subprocess.Popen(term_cmd)
+                            success = True
+                            msg = f"Opened terminal prompt to enter sudo password and set limit to {target}%!"
+                        except Exception as te:
+                            success = False
+                            msg = f"Please run in terminal: sudo ./limitd.sh {target}"
             except Exception as e:
                 success = False
                 msg = f"Failed to execute authorization command: {e}"
 
         self.show_notification(msg, success=success)
-        self.refresh_status()
+        # Small delay then refresh status
+        GLib.timeout_add(1000, self.refresh_status)
 
 def main():
     app = BatteryLimiterApp()
