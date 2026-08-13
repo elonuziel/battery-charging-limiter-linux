@@ -4,6 +4,7 @@ set -e
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 DESKTOP_MENU_DIR="$HOME/.local/share/applications"
 DESKTOP_DIR="$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")"
+SUDOERS_FILE="/etc/sudoers.d/battery-limiter"
 
 echo "Installing Battery Charge Limiter..."
 
@@ -37,6 +38,16 @@ if [ -d "$DESKTOP_DIR" ]; then
         gio set "$DESKTOP_DIR/battery-limiter.desktop" metadata::trusted true 2>/dev/null || true
     fi
     echo "✓ Created desktop shortcut at: $DESKTOP_DIR/battery-limiter.desktop"
+fi
+
+# 3. Setup Sudoers Rule for seamless execution if run as root/sudo
+if [ "$EUID" -eq 0 ]; then
+    REAL_USER="${SUDO_USER:-$USER}"
+    echo "$REAL_USER ALL=(ALL) NOPASSWD: $SCRIPT_DIR/battery_limiter_backend.py set *" > "$SUDOERS_FILE"
+    chmod 0440 "$SUDOERS_FILE"
+    echo "✓ Configured sudoers rule in $SUDOERS_FILE for seamless threshold changes!"
+else
+    echo "ℹ Note: Run 'sudo ./install.sh' to enable passwordless limit setting for the GUI!"
 fi
 
 echo "✓ Battery Charge Limiter installed successfully!"

@@ -130,6 +130,15 @@ window.main-window {
     background-color: #45475a;
 }
 
+.info-note {
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #94a3b8;
+}
+
 .notification-box {
     border-radius: 10px;
     padding: 10px 14px;
@@ -172,7 +181,6 @@ Keywords=battery;charge;limit;threshold;asus;laptop;health;
             with open(target_path, "w") as f:
                 f.write(content)
             os.chmod(target_path, 0o755)
-            # Mark trusted if gio is available
             subprocess.run(["gio", "set", target_path, "metadata::trusted", "true"], check=False)
             return True, target_path
         except Exception as e:
@@ -182,7 +190,7 @@ Keywords=battery;charge;limit;threshold;asus;laptop;health;
 class BatteryLimiterApp(Gtk.Window):
     def __init__(self):
         super().__init__(title="Battery Charge Limiter")
-        self.set_default_size(540, 720)
+        self.set_default_size(540, 760)
         self.set_position(Gtk.WindowPosition.CENTER)
         self.get_style_context().add_class("main-window")
 
@@ -290,6 +298,17 @@ class BatteryLimiterApp(Gtk.Window):
 
         main_vbox.pack_start(dash_card, False, False, 0)
 
+        # Explanatory Info Note on Battery Behavior
+        note_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        note_box.get_style_context().add_class("info-note")
+        self.note_lbl = Gtk.Label(
+            label="💡 Note: If your current battery (e.g. 98%) is above your chosen limit (e.g. 60%), hardware charging stops immediately. The battery will slowly drain down to 60% and stay there.",
+            xalign=0
+        )
+        self.note_lbl.set_line_wrap(True)
+        note_box.pack_start(self.note_lbl, False, False, 0)
+        main_vbox.pack_start(note_box, False, False, 0)
+
         # 3. Decision Guidance & Presets
         decision_label = Gtk.Label(label="Choose Your Recommended Limit", xalign=0)
         decision_label.get_style_context().add_class("card-title")
@@ -383,6 +402,12 @@ class BatteryLimiterApp(Gtk.Window):
 
         self.status_val_lbl.set_text(stat)
 
+        if cap is not None and thresh is not None and cap > thresh:
+            self.note_lbl.set_text(
+                f"💡 Note: Your battery ({cap}%) is currently above your set limit ({thresh}%). "
+                f"Charging is active hardware-blocked! Battery will slowly drain down to {thresh}% and hold."
+            )
+
         if svc:
             self.service_badge.set_text("✓ Boot Persistent (systemd enabled)")
             self.service_badge.get_style_context().remove_class("badge-info")
@@ -437,19 +462,27 @@ class BatteryLimiterApp(Gtk.Window):
         if os.geteuid() == 0:
             success, msg = battery_limiter_backend.apply_limit(target)
         else:
-            # Try pkexec or sudo
-            cmd = ["pkexec", sys.executable, backend_script, "set", str(target)]
+            # 1. Try sudo without password first
+            cmd_sudo = ["sudo", "-n", sys.executable, backend_script, "set", str(target)]
             try:
-                res = subprocess.run(cmd, capture_output=True, text=True)
+                res = subprocess.run(cmd_sudo, capture_output=True, text=True)
                 if res.returncode == 0:
                     success = True
                     msg = res.stdout.strip() or f"Successfully set charge limit to {target}%!"
                 else:
-                    success = False
-                    msg = res.stderr.strip() or res.stdout.strip() or "Authentication failed or cancelled."
+                    # 2. Fall back to pkexec (Graphical Password Prompt)
+                    cmd_pkexec = ["pkexec", sys.executable, backend_script, "set", str(target)]
+                    res_pk = subprocess.run(cmd_pkexec, capture_output=True, text=True)
+                    if res_pk.returncode == 0:
+                        success = True
+                        msg = res_pk.stdout.strip() or f"Successfully set charge limit to {target}%!"
+                    else:
+                        success = False
+                        err_out = res_pk.stderr.strip() or res_pk.stdout.strip()
+                        msg = f"Authentication required: {err_out}\nRun 'sudo ./install.sh' to enable one-click passwordless limit changes!"
             except Exception as e:
                 success = False
-                msg = f"Failed to execute pkexec: {e}"
+                msg = f"Failed to execute authorization command: {e}"
 
         self.show_notification(msg, success=success)
         self.refresh_status()
