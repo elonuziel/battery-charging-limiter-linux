@@ -109,8 +109,9 @@ if [ "$APPLIED" -eq 0 ]; then
     exit 1
 fi
 
-# Write systemd service for reboot persistence across reboots, suspends, hibernates
-cat > "$SYSTEMD_SERVICE" << EOF
+# Write systemd service for reboot persistence (when running as root)
+if [ "$EUID" -eq 0 ]; then
+    cat > "$SYSTEMD_SERVICE" << EOF
 [Unit]
 Description=Set battery charge threshold on boot and resume
 After=multi-user.target suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target
@@ -123,8 +124,9 @@ ExecStart=/bin/bash -c 'for f in /sys/class/power_supply/*/charge_control_end_th
 WantedBy=multi-user.target suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target
 EOF
 
-systemctl daemon-reload 2>/dev/null || true
-systemctl enable battery-manager.service 2>/dev/null || true
-systemctl start battery-manager.service 2>/dev/null || true
+    systemctl daemon-reload 2>/dev/null || true
+    systemctl enable battery-manager.service 2>/dev/null || true
+    systemctl start battery-manager.service 2>/dev/null || true
+fi
 
 echo "Successfully set battery charge threshold ($LIMIT%) and enabled reboot persistence!"

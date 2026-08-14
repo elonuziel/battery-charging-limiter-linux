@@ -2,6 +2,7 @@
 """
 Battery Charge Limiter GUI for Linux (GTK 3).
 A modern, beautiful, and intuitive battery threshold manager with:
+- Instant UI synchronization across live battery status, target profiles, and percentages
 - Dark and Light theme support with instant toggle & persistence
 - Universal support for Lenovo, ASUS, Dell, LG Gram, Samsung, Huawei, Framework, System76, Sony, MSI, Apple Silicon
 """
@@ -141,28 +142,37 @@ button:hover {
 }
 
 /* Preset Cards */
-.preset-card {
+button.preset-card {
     background-color: #101622;
     border: 2px solid #1e2838;
     border-radius: 12px;
     padding: 12px 14px;
+    color: #f1f5f9;
 }
-.preset-card:hover {
+button.preset-card:hover {
     background-color: #192336;
     border-color: #38bdf8;
 }
-.preset-card-selected {
+button.preset-card.preset-card-selected {
     background-color: #0b2545;
-    border-color: #38bdf8;
+    border: 2px solid #38bdf8;
 }
-.preset-title {
+button.preset-card label.preset-title {
     font-size: 13px;
     font-weight: 700;
     color: #38bdf8;
 }
-.preset-desc {
+button.preset-card.preset-card-selected label.preset-title {
+    color: #38bdf8;
+}
+button.preset-card label.preset-desc {
     font-size: 11px;
     color: #94a3b8;
+}
+button.preset-card label.preset-badge-lbl {
+    font-size: 10px;
+    font-weight: 700;
+    color: #38bdf8;
 }
 
 /* Slider & Pills */
@@ -171,59 +181,59 @@ button:hover {
     font-weight: 800;
     color: #38bdf8;
 }
-.btn-pill {
+button.btn-pill {
     background-color: #101622;
     border: 1px solid #232e42;
     border-radius: 6px;
     padding: 6px 10px;
 }
-.btn-pill label {
+button.btn-pill label {
     color: #cbd5e1;
     font-size: 11px;
     font-weight: 600;
 }
-.btn-pill:hover {
+button.btn-pill:hover {
     background-color: #1d273b;
     border-color: #38bdf8;
 }
-.btn-pill-active {
+button.btn-pill.btn-pill-active {
     background-color: #0284c7;
-    border-color: #38bdf8;
+    border: 1px solid #38bdf8;
 }
-.btn-pill-active label {
+button.btn-pill.btn-pill-active label {
     color: #ffffff;
-    font-weight: 700;
+    font-weight: 800;
 }
 
 /* Primary Apply Button */
-.btn-primary {
+button.btn-primary {
     background-color: #0284c7;
     border: 1px solid #38bdf8;
     border-radius: 10px;
     padding: 12px 20px;
 }
-.btn-primary label {
+button.btn-primary label {
     color: #ffffff;
     font-size: 13px;
     font-weight: 700;
 }
-.btn-primary:hover {
+button.btn-primary:hover {
     background-color: #0369a1;
 }
 
 /* Secondary Button */
-.btn-secondary {
+button.btn-secondary {
     background-color: #141b29;
     border: 1px solid #232e42;
     border-radius: 8px;
     padding: 6px 12px;
 }
-.btn-secondary label {
+button.btn-secondary label {
     color: #cbd5e1;
     font-size: 11px;
     font-weight: 600;
 }
-.btn-secondary:hover {
+button.btn-secondary:hover {
     background-color: #1d273b;
     border-color: #38bdf8;
 }
@@ -401,28 +411,37 @@ button:hover {
 }
 
 /* Preset Cards */
-.preset-card {
+button.preset-card {
     background-color: #ffffff;
     border: 2px solid #e2e8f0;
     border-radius: 12px;
     padding: 12px 14px;
+    color: #0f172a;
 }
-.preset-card:hover {
+button.preset-card:hover {
     background-color: #f8fafc;
     border-color: #0284c7;
 }
-.preset-card-selected {
+button.preset-card.preset-card-selected {
     background-color: #e0f2fe;
-    border-color: #0284c7;
+    border: 2px solid #0284c7;
 }
-.preset-title {
+button.preset-card label.preset-title {
     font-size: 13px;
     font-weight: 700;
     color: #0284c7;
 }
-.preset-desc {
+button.preset-card.preset-card-selected label.preset-title {
+    color: #0284c7;
+}
+button.preset-card label.preset-desc {
     font-size: 11px;
     color: #475569;
+}
+button.preset-card label.preset-badge-lbl {
+    font-size: 10px;
+    font-weight: 700;
+    color: #0284c7;
 }
 
 /* Slider & Pills */
@@ -431,59 +450,59 @@ button:hover {
     font-weight: 800;
     color: #0284c7;
 }
-.btn-pill {
+button.btn-pill {
     background-color: #ffffff;
     border: 1px solid #cbd5e1;
     border-radius: 6px;
     padding: 6px 10px;
 }
-.btn-pill label {
+button.btn-pill label {
     color: #334155;
     font-size: 11px;
     font-weight: 600;
 }
-.btn-pill:hover {
+button.btn-pill:hover {
     background-color: #f1f5f9;
     border-color: #0284c7;
 }
-.btn-pill-active {
+button.btn-pill.btn-pill-active {
     background-color: #0284c7;
-    border-color: #0369a1;
+    border: 1px solid #0369a1;
 }
-.btn-pill-active label {
+button.btn-pill.btn-pill-active label {
     color: #ffffff;
-    font-weight: 700;
+    font-weight: 800;
 }
 
 /* Primary Apply Button */
-.btn-primary {
+button.btn-primary {
     background-color: #0284c7;
     border: 1px solid #0369a1;
     border-radius: 10px;
     padding: 12px 20px;
 }
-.btn-primary label {
+button.btn-primary label {
     color: #ffffff;
     font-size: 13px;
     font-weight: 700;
 }
-.btn-primary:hover {
+button.btn-primary:hover {
     background-color: #0369a1;
 }
 
 /* Secondary Button */
-.btn-secondary {
+button.btn-secondary {
     background-color: #ffffff;
     border: 1px solid #cbd5e1;
     border-radius: 8px;
     padding: 6px 12px;
 }
-.btn-secondary label {
+button.btn-secondary label {
     color: #334155;
     font-size: 11px;
     font-weight: 600;
 }
-.btn-secondary:hover {
+button.btn-secondary:hover {
     background-color: #f1f5f9;
     border-color: #0284c7;
 }
@@ -596,7 +615,7 @@ def create_desktop_shortcut():
 class BatteryLimiterApp(Gtk.Window):
     def __init__(self):
         super().__init__(title="Battery Charge Limiter")
-        self.set_default_size(560, 820)
+        self.set_default_size(560, 840)
         self.set_resizable(False)
         self.set_position(Gtk.WindowPosition.CENTER)
         self.get_style_context().add_class("main-window")
@@ -605,12 +624,14 @@ class BatteryLimiterApp(Gtk.Window):
         self.config = load_config()
         self.current_theme = self.config.get("theme", "dark")
         self.css_provider = Gtk.CssProvider()
+        self._updating_scale = False
 
         self._apply_theme(self.current_theme)
 
         self.info = battery_limiter_backend.get_battery_info()
         self.selected_target = self.info.get("threshold") or 60
         self.preset_widgets = {}
+        self.preset_badge_labels = {}
         self.pill_buttons = {}
 
         self.build_ui()
@@ -728,12 +749,12 @@ class BatteryLimiterApp(Gtk.Window):
 
         root.pack_start(hw_card, False, False, 0)
 
-        # ── 3. Live Battery Status Card ──────────────────────────────────────
+        # ── 3. Live Battery & Profile Status Card ────────────────────────────
         status_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         status_card.get_style_context().add_class("card")
 
         status_hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        sec_title = Gtk.Label(label="Live Battery & Threshold Status", xalign=0)
+        sec_title = Gtk.Label(label="Live Battery & Active Profile", xalign=0)
         sec_title.get_style_context().add_class("section-heading")
         self.service_badge = Gtk.Label(label="")
         self.service_badge.get_style_context().add_class("badge")
@@ -744,7 +765,7 @@ class BatteryLimiterApp(Gtk.Window):
         # Grid stats
         grid = Gtk.Grid()
         grid.set_column_spacing(16)
-        grid.set_row_spacing(4)
+        grid.set_row_spacing(6)
         grid.set_column_homogeneous(True)
 
         def stat_col(title, row=0, col=0):
@@ -756,18 +777,23 @@ class BatteryLimiterApp(Gtk.Window):
             grid.attach(val, col, row + 1, 1, 1)
             return val
 
+        # Big live percentage display
         self.cap_val_lbl = Gtk.Label(label="--%", xalign=0)
         self.cap_val_lbl.get_style_context().add_class("status-val-big")
 
         cap_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        cap_title = Gtk.Label(label="CURRENT CHARGE", xalign=0)
+        cap_title = Gtk.Label(label="CURRENT BATTERY", xalign=0)
         cap_title.get_style_context().add_class("status-meta-title")
         cap_box.pack_start(cap_title, False, False, 0)
         cap_box.pack_start(self.cap_val_lbl, False, False, 0)
         grid.attach(cap_box, 0, 0, 1, 2)
 
-        self.thresh_lbl = stat_col("ACTIVE LIMIT", col=1)
-        self.status_lbl = stat_col("POWER STATE", col=2)
+        self.thresh_lbl = stat_col("ACTIVE LIMIT", row=0, col=1)
+        self.status_lbl = stat_col("POWER STATE", row=0, col=2)
+
+        # Selected Target Profile live readout
+        self.target_profile_lbl = stat_col("TARGET SELECTION", row=2, col=1)
+        self.health_mode_lbl = stat_col("CONSERVATION STATE", row=2, col=2)
 
         status_card.pack_start(grid, False, False, 0)
 
@@ -781,18 +807,23 @@ class BatteryLimiterApp(Gtk.Window):
 
         # ── 4. Target Threshold Presets ──────────────────────────────────────
         choose_hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        choose_lbl = Gtk.Label(label="Choose Your Charge Limit", xalign=0)
+        choose_lbl = Gtk.Label(label="Choose Your Battery Profile", xalign=0)
         choose_lbl.get_style_context().add_class("section-heading")
+        self.target_badge = Gtk.Label(label=f"🎯 Target: {self.selected_target}%", xalign=1)
+        self.target_badge.get_style_context().add_class("badge")
+        self.target_badge.get_style_context().add_class("badge-info")
+
         choose_hdr.pack_start(choose_lbl, True, True, 0)
+        choose_hdr.pack_end(self.target_badge, False, False, 0)
         root.pack_start(choose_hdr, False, False, 0)
 
         presets = [
-            (60, "🌿 Maximum Lifespan  (60%)",
-             "Recommended for continuous AC power / desk use. Minimizes cell voltage stress & heat build-up."),
-            (80, "⚖️ Daily Balance  (80%)",
+            (60, "🌿 Maximum Lifespan (60%)",
+             "Recommended for continuous AC power / desk work. Minimizes battery voltage stress & heat build-up."),
+            (80, "⚖️ Daily Balance (80%)",
              "Recommended for daily mixed use. Balances chemical longevity with sufficient mobile battery run-time."),
-            (100, "✈️ Full Capacity  (100%)",
-             "For travel, flights, or long off-grid work. Charges battery to 100% capacity."),
+            (100, "✈️ Full Capacity (100%)",
+             "For travel, flights, or long off-grid work. Charges battery to full 100% capacity."),
         ]
 
         self.presets_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
@@ -800,17 +831,26 @@ class BatteryLimiterApp(Gtk.Window):
             btn = Gtk.Button()
             btn.get_style_context().add_class("preset-card")
             inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+
+            top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
             t = Gtk.Label(label=title, xalign=0)
             t.get_style_context().add_class("preset-title")
+            badge_lbl = Gtk.Label(label="", xalign=1)
+            badge_lbl.get_style_context().add_class("preset-badge-lbl")
+            top_row.pack_start(t, True, True, 0)
+            top_row.pack_end(badge_lbl, False, False, 0)
+
             d = Gtk.Label(label=desc, xalign=0)
             d.get_style_context().add_class("preset-desc")
             d.set_line_wrap(True)
-            inner.pack_start(t, False, False, 0)
+
+            inner.pack_start(top_row, False, False, 0)
             inner.pack_start(d, False, False, 0)
             btn.add(inner)
             btn.connect("clicked", self._on_preset_click, val)
             self.presets_box.pack_start(btn, False, False, 0)
             self.preset_widgets[val] = btn
+            self.preset_badge_labels[val] = badge_lbl
 
         root.pack_start(self.presets_box, False, False, 0)
 
@@ -819,7 +859,7 @@ class BatteryLimiterApp(Gtk.Window):
         slider_card.get_style_context().add_class("card")
 
         slider_hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        slider_title = Gtk.Label(label="Precision Target & Custom Values", xalign=0)
+        slider_title = Gtk.Label(label="Precision Target Slider", xalign=0)
         slider_title.get_style_context().add_class("section-heading")
         self.slider_lbl = Gtk.Label(label=f"{self.selected_target}%", xalign=1)
         self.slider_lbl.get_style_context().add_class("slider-val-label")
@@ -854,7 +894,7 @@ class BatteryLimiterApp(Gtk.Window):
         root.pack_start(slider_card, False, False, 0)
 
         # ── 6. Apply Button ──────────────────────────────────────────────────
-        self.apply_btn = Gtk.Button(label="⚡ Apply Limit & Save (Persists on Reboot)")
+        self.apply_btn = Gtk.Button(label=f"⚡ Apply {self.selected_target}% Limit & Save (Persists on Reboot)")
         self.apply_btn.get_style_context().add_class("btn-primary")
         self.apply_btn.connect("clicked", self._on_apply)
         root.pack_start(self.apply_btn, False, False, 0)
@@ -889,6 +929,7 @@ class BatteryLimiterApp(Gtk.Window):
         interface = info.get("interface", {})
         cap = info.get("capacity")
         thresh_display = info.get("threshold_display", "N/A")
+        is_conservation_active = info.get("is_conservation_active", False)
         stat = info.get("status", "Unknown")
         svc = info.get("service_enabled", False)
         manufacturer = info.get("manufacturer", "")
@@ -935,6 +976,17 @@ class BatteryLimiterApp(Gtk.Window):
         if cap is not None:
             self.level_bar.set_value(cap / 100.0)
 
+        # Conservation state readout
+        if driver_type == "conservation_mode":
+            if is_conservation_active:
+                self.health_mode_lbl.set_text("Active (55-60% Cap)")
+            else:
+                self.health_mode_lbl.set_text("Disabled (100% Full)")
+        elif driver_type == "percentage":
+            self.health_mode_lbl.set_text(f"{thresh_display} Threshold")
+        else:
+            self.health_mode_lbl.set_text(thresh_display)
+
         # Persistence badge
         ctx = self.service_badge.get_style_context()
         for cls in ["badge-success", "badge-info", "badge-warning"]:
@@ -966,7 +1018,7 @@ class BatteryLimiterApp(Gtk.Window):
                 "⚠️ First-time setup: Run 'sudo ./install.sh' in terminal to enable passwordless control."
             )
 
-        # Explanatory tip for current target
+        # Update target profile label & hardware tip
         self._update_hardware_tip(self.selected_target)
 
         return True
@@ -974,20 +1026,43 @@ class BatteryLimiterApp(Gtk.Window):
     # ── Selection & Event Handlers ────────────────────────────────────────────
 
     def _on_preset_click(self, _btn, val):
+        self._updating_scale = True
         self.scale.set_value(val)
+        self._updating_scale = False
         self._update_selection(val)
 
     def _on_pill_click(self, _btn, val):
+        self._updating_scale = True
         self.scale.set_value(val)
+        self._updating_scale = False
         self._update_selection(val)
 
     def _on_scale_change(self, scale):
+        if self._updating_scale:
+            return
         val = int(scale.get_value())
         self._update_selection(val)
 
     def _update_selection(self, val):
         self.selected_target = val
         self.slider_lbl.set_text(f"{val}%")
+
+        # Update target badge in header
+        if hasattr(self, "target_badge"):
+            self.target_badge.set_text(f"🎯 Target: {val}%")
+
+        # Update target profile live label in stats grid
+        if hasattr(self, "target_profile_lbl"):
+            if val <= 60:
+                self.target_profile_lbl.set_text(f"🌿 Lifespan ({val}%)")
+            elif val <= 85:
+                self.target_profile_lbl.set_text(f"⚖️ Daily ({val}%)")
+            else:
+                self.target_profile_lbl.set_text(f"✈️ Full ({val}%)")
+
+        # Update Apply button label
+        if hasattr(self, "apply_btn"):
+            self.apply_btn.set_label(f"⚡ Apply {val}% Limit & Save (Persists on Reboot)")
 
         # Highlight preset card
         closest_preset = None
@@ -1000,10 +1075,15 @@ class BatteryLimiterApp(Gtk.Window):
 
         for pval, btn in self.preset_widgets.items():
             ctx = btn.get_style_context()
+            badge_lbl = self.preset_badge_labels.get(pval)
             if pval == val or (min_diff <= 10 and pval == closest_preset):
                 ctx.add_class("preset-card-selected")
+                if badge_lbl:
+                    badge_lbl.set_text("✓ SELECTED")
             else:
                 ctx.remove_class("preset-card-selected")
+                if badge_lbl:
+                    badge_lbl.set_text("")
 
         # Highlight pill buttons
         for pval, pbtn in self.pill_buttons.items():
@@ -1052,14 +1132,21 @@ class BatteryLimiterApp(Gtk.Window):
     def _on_apply(self, _btn):
         target = self.selected_target
         self.apply_btn.set_sensitive(False)
-        self.apply_btn.set_label("⚡ Applying Limit…")
+        self.apply_btn.set_label(f"⚡ Applying {target}% Limit…")
+
+        # Process GTK events so UI updates button state immediately
+        while Gtk.events_pending():
+            Gtk.main_iteration_do(False)
 
         success, msg = self._apply_limit(target)
         self._show_result(msg, success)
 
+        # Refresh status immediately to show updated hardware mode
+        self.refresh_status()
+
         self.apply_btn.set_sensitive(True)
-        self.apply_btn.set_label("⚡ Apply Limit & Save (Persists on Reboot)")
-        GLib.timeout_add(800, self.refresh_status)
+        self.apply_btn.set_label(f"⚡ Apply {target}% Limit & Save (Persists on Reboot)")
+        GLib.timeout_add(500, self.refresh_status)
 
     def _apply_limit(self, target):
         """Attempts application via root helper (pkexec) -> direct write -> pkexec python -> terminal sudo."""
@@ -1068,8 +1155,10 @@ class BatteryLimiterApp(Gtk.Window):
         # 1. Root helper via pkexec
         if info.get("helper_installed"):
             result = self._try_pkexec_helper(target)
-            if result[0] or result[1] == "Authentication cancelled.":
+            if result[0]:
                 return result
+            if result[1] == "Authentication cancelled.":
+                return False, "Authentication cancelled by user."
 
         # 2. Direct write if running as root
         if info.get("is_root"):
