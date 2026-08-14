@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Battery Charge Limiter GUI for Linux (GTK 3).
-Helps users choose an optimal charging limit, applies it, and ensures persistence on reboot.
-Designed for ASUS laptops on Ubuntu Linux with systemd.
+Universal support for Lenovo (ThinkBook, IdeaPad, Legion, Yoga, ThinkPad),
+ASUS, Dell, LG Gram, Samsung, Huawei, Framework, System76, Sony, MSI, and Linux 5.4+ laptops.
 """
 
 import sys
@@ -26,19 +26,34 @@ window.main-window {
     color: #cdd6f4;
 }
 .header-title {
-    font-size: 21px;
+    font-size: 20px;
     font-weight: 800;
     color: #cdd6f4;
 }
 .header-subtitle {
-    font-size: 13px;
+    font-size: 12px;
     color: #a6adc8;
 }
 .card {
     background-color: #1e1e2e;
     border-radius: 12px;
-    padding: 16px;
+    padding: 14px 16px;
     border: 1px solid #313244;
+}
+.hardware-card {
+    background-color: #161622;
+    border-radius: 10px;
+    padding: 10px 14px;
+    border: 1px solid #2d2e40;
+}
+.hw-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #89b4fa;
+}
+.hw-value {
+    font-size: 12px;
+    color: #cdd6f4;
 }
 .card-title {
     font-size: 14px;
@@ -46,7 +61,7 @@ window.main-window {
     color: #cdd6f4;
 }
 .status-value {
-    font-size: 28px;
+    font-size: 26px;
     font-weight: 800;
     color: #89b4fa;
 }
@@ -69,7 +84,8 @@ window.main-window {
     background-color: #1e1e2e;
     border-radius: 12px;
     border: 2px solid #313244;
-    padding: 12px;
+    padding: 12px 14px;
+    transition: all 150ms ease-in-out;
 }
 .preset-card:hover {
     border-color: #585b70;
@@ -77,24 +93,25 @@ window.main-window {
 }
 .preset-card-selected {
     border-color: #89b4fa;
-    background-color: #18243b;
+    background-color: #19263e;
 }
 .preset-title {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
     color: #89b4fa;
 }
 .preset-subtitle {
     font-size: 11px;
     color: #bac2de;
+    line-height: 1.3;
 }
 .btn-primary {
     background: linear-gradient(135deg, #89b4fa, #74c7ec);
     color: #11111b;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 13px;
     border-radius: 10px;
-    padding: 11px 24px;
+    padding: 11px 22px;
     border: none;
 }
 .btn-primary:hover {
@@ -136,12 +153,12 @@ def create_desktop_shortcut():
         "Terminal=false\n"
         "Type=Application\n"
         "Categories=Settings;HardwareSettings;System;GTK;\n"
-        "Keywords=battery;charge;limit;threshold;asus;laptop;health;\n"
+        "Keywords=battery;charge;limit;threshold;lenovo;asus;dell;laptop;health;\n"
     )
     if os.path.isdir(desktop_dir):
         target = os.path.join(desktop_dir, "battery-limiter.desktop")
         try:
-            with open(target, "w") as f:
+            with open(target, "w", encoding="utf-8") as f:
                 f.write(content)
             os.chmod(target, 0o755)
             subprocess.run(["gio", "set", target, "metadata::trusted", "true"],
@@ -155,7 +172,7 @@ def create_desktop_shortcut():
 class BatteryLimiterApp(Gtk.Window):
     def __init__(self):
         super().__init__(title="Battery Charge Limiter")
-        self.set_default_size(520, 760)
+        self.set_default_size(540, 780)
         self.set_resizable(False)
         self.set_position(Gtk.WindowPosition.CENTER)
         self.get_style_context().add_class("main-window")
@@ -167,47 +184,61 @@ class BatteryLimiterApp(Gtk.Window):
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
 
-        self.selected_target = 80
+        self.info = battery_limiter_backend.get_battery_info()
+        self.selected_target = self.info.get("threshold") or 80
         self.preset_widgets = {}
+        self.slider_card = None
+        self.scale = None
 
         self.build_ui()
         self.refresh_status()
         GLib.timeout_add_seconds(3, self.refresh_status)
-
-    # ── UI construction ──────────────────────────────────────────────────────
 
     def build_ui(self):
         scroll = Gtk.ScrolledWindow()
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         self.add(scroll)
 
-        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
-        root.set_margin_top(20)
-        root.set_margin_bottom(20)
-        root.set_margin_left(22)
-        root.set_margin_right(22)
+        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        root.set_margin_top(16)
+        root.set_margin_bottom(16)
+        root.set_margin_left(20)
+        root.set_margin_right(20)
         scroll.add(root)
 
         # Header
         hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        hdr_txt = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+        hdr_txt = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         ttl = Gtk.Label(label="⚡ Battery Charge Limiter", xalign=0)
         ttl.get_style_context().add_class("header-title")
         sub = Gtk.Label(
-            label="Extend battery lifespan by capping the max charge percentage",
+            label="Prolong battery lifespan by capping maximum charge percentage",
             xalign=0, wrap=True
         )
         sub.get_style_context().add_class("header-subtitle")
         hdr_txt.pack_start(ttl, False, False, 0)
         hdr_txt.pack_start(sub, False, False, 0)
 
-        shortcut_btn = Gtk.Button(label="📌 Desktop Shortcut")
+        shortcut_btn = Gtk.Button(label="📌 Desktop Icon")
         shortcut_btn.get_style_context().add_class("btn-secondary")
         shortcut_btn.connect("clicked", lambda _: self._do_desktop_shortcut())
 
         hdr.pack_start(hdr_txt, True, True, 0)
         hdr.pack_end(shortcut_btn, False, False, 0)
         root.pack_start(hdr, False, False, 0)
+
+        # Detected Hardware Card
+        hw_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        hw_card.get_style_context().add_class("hardware-card")
+
+        self.laptop_lbl = Gtk.Label(label="", xalign=0)
+        self.laptop_lbl.get_style_context().add_class("hw-value")
+        self.driver_lbl = Gtk.Label(label="", xalign=0)
+        self.driver_lbl.get_style_context().add_class("hw-label")
+
+        hw_card.pack_start(self.laptop_lbl, False, False, 0)
+        hw_card.pack_start(self.driver_lbl, False, False, 0)
+        root.pack_start(hw_card, False, False, 0)
 
         # Auth / install status notice
         self.auth_notice = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -217,12 +248,12 @@ class BatteryLimiterApp(Gtk.Window):
         self.auth_notice.pack_start(self.auth_lbl, False, False, 0)
         root.pack_start(self.auth_notice, False, False, 0)
 
-        # Battery status card
+        # Battery live status card
         status_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         status_card.get_style_context().add_class("card")
 
         status_hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        status_title = Gtk.Label(label="Live Battery Status", xalign=0)
+        status_title = Gtk.Label(label="Live Battery & Limit Status", xalign=0)
         status_title.get_style_context().add_class("card-title")
         self.service_badge = Gtk.Label(label="")
         self.service_badge.get_style_context().add_class("badge")
@@ -230,14 +261,14 @@ class BatteryLimiterApp(Gtk.Window):
         status_hdr.pack_end(self.service_badge, False, False, 0)
         status_card.pack_start(status_hdr, False, False, 0)
 
-        # Model info
-        self.model_lbl = Gtk.Label(label="", xalign=0)
-        self.model_lbl.get_style_context().add_class("header-subtitle")
-        status_card.pack_start(self.model_lbl, False, False, 0)
+        # Battery details line
+        self.bat_details_lbl = Gtk.Label(label="", xalign=0)
+        self.bat_details_lbl.get_style_context().add_class("header-subtitle")
+        status_card.pack_start(self.bat_details_lbl, False, False, 0)
 
-        # Stats row
+        # Stats grid
         grid = Gtk.Grid()
-        grid.set_column_spacing(20)
+        grid.set_column_spacing(16)
         grid.set_row_spacing(4)
         grid.set_column_homogeneous(True)
 
@@ -251,8 +282,8 @@ class BatteryLimiterApp(Gtk.Window):
             return val
 
         self.cap_lbl = stat_col("Current Level", col=0)
-        self.thresh_lbl = stat_col("Hardware Limit", col=1)
-        self.status_lbl = stat_col("Power Status", col=2)
+        self.thresh_lbl = stat_col("Active Limit", col=1)
+        self.status_lbl = stat_col("Power State", col=2)
 
         status_card.pack_start(grid, False, False, 0)
 
@@ -264,21 +295,26 @@ class BatteryLimiterApp(Gtk.Window):
 
         root.pack_start(status_card, False, False, 0)
 
-        # Preset cards
-        choose_lbl = Gtk.Label(label="Choose Your Limit", xalign=0)
+        # Presets Section
+        choose_lbl = Gtk.Label(label="Choose Charging Limit", xalign=0)
         choose_lbl.get_style_context().add_class("card-title")
         root.pack_start(choose_lbl, False, False, 0)
 
-        presets = [
-            (60,  "🌿 Maximum Lifespan  (60%)",
-             "Ideal for always-plugged-in desks. Minimises voltage stress and heat."),
-            (80,  "⚖️ Daily Balance  (80%)",
-             "Recommended. Best mix of longevity and enough capacity for mobile use."),
-            (100, "✈️ Full Capacity  (100%)",
-             "For travel or long off-grid use. Revert to 80% when back at desk."),
-        ]
-        presets_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        for pct, title, desc in presets:
+        interface = self.info.get("interface", {})
+        presets = interface.get("presets", [])
+        if not presets:
+            presets = [
+                {"value": 60, "label": "🌿 Maximum Lifespan (60%)", "desc": "Ideal for desk work with charger plugged in."},
+                {"value": 80, "label": "⚖️ Daily Balance (80%)", "desc": "Recommended. Best mix of longevity and mobile capacity."},
+                {"value": 100, "label": "✈️ Full Capacity (100%)", "desc": "For travel, flights, or off-grid usage."},
+            ]
+
+        self.presets_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        for p in presets:
+            val = p["value"]
+            title = p["label"]
+            desc = p["desc"]
+
             btn = Gtk.Button()
             btn.get_style_context().add_class("preset-card")
             inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
@@ -290,28 +326,34 @@ class BatteryLimiterApp(Gtk.Window):
             inner.pack_start(t, False, False, 0)
             inner.pack_start(d, False, False, 0)
             btn.add(inner)
-            btn.connect("clicked", self._on_preset, pct)
-            presets_box.pack_start(btn, False, False, 0)
-            self.preset_widgets[pct] = btn
-        root.pack_start(presets_box, False, False, 0)
+            btn.connect("clicked", self._on_preset, val)
+            self.presets_box.pack_start(btn, False, False, 0)
+            self.preset_widgets[val] = btn
 
-        # Custom slider
-        slider_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        slider_card.get_style_context().add_class("card")
-        slider_hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        slider_title = Gtk.Label(label="Custom Value", xalign=0)
-        slider_title.get_style_context().add_class("card-title")
-        self.slider_lbl = Gtk.Label(label="80%", xalign=1)
-        self.slider_lbl.get_style_context().add_class("preset-title")
-        slider_hdr.pack_start(slider_title, True, True, 0)
-        slider_hdr.pack_end(self.slider_lbl, False, False, 0)
-        slider_card.pack_start(slider_hdr, False, False, 0)
-        self.scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 20, 100, 5)
-        self.scale.set_value(80)
-        self.scale.set_draw_value(False)
-        self.scale.connect("value-changed", self._on_scale)
-        slider_card.pack_start(self.scale, False, False, 0)
-        root.pack_start(slider_card, False, False, 0)
+        root.pack_start(self.presets_box, False, False, 0)
+
+        # Fine slider (if supported by driver)
+        if interface.get("supports_slider", True):
+            self.slider_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+            self.slider_card.get_style_context().add_class("card")
+            slider_hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+            slider_title = Gtk.Label(label="Custom Value Slider", xalign=0)
+            slider_title.get_style_context().add_class("card-title")
+            self.slider_lbl = Gtk.Label(label=f"{self.selected_target}%", xalign=1)
+            self.slider_lbl.get_style_context().add_class("preset-title")
+            slider_hdr.pack_start(slider_title, True, True, 0)
+            slider_hdr.pack_end(self.slider_lbl, False, False, 0)
+            self.slider_card.pack_start(slider_hdr, False, False, 0)
+
+            min_l = interface.get("min_limit", 20)
+            max_l = interface.get("max_limit", 100)
+            step = interface.get("step", 5)
+            self.scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, min_l, max_l, step)
+            self.scale.set_value(self.selected_target)
+            self.scale.set_draw_value(False)
+            self.scale.connect("value-changed", self._on_scale)
+            self.slider_card.pack_start(self.scale, False, False, 0)
+            root.pack_start(self.slider_card, False, False, 0)
 
         # Apply button
         self.apply_btn = Gtk.Button(label="Apply Limit & Save (Persists on Reboot)")
@@ -319,7 +361,7 @@ class BatteryLimiterApp(Gtk.Window):
         self.apply_btn.connect("clicked", self._on_apply)
         root.pack_start(self.apply_btn, False, False, 0)
 
-        # Result notice
+        # Result feedback notice
         self.result_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.result_box.get_style_context().add_class("notice-box")
         self.result_lbl = Gtk.Label(label="", xalign=0)
@@ -329,28 +371,49 @@ class BatteryLimiterApp(Gtk.Window):
         self.result_box.hide()
         root.pack_start(self.result_box, False, False, 0)
 
-        self._update_selection(80)
+        self._update_selection(self.selected_target)
 
     # ── Status refresh ────────────────────────────────────────────────────────
 
     def refresh_status(self):
         info = battery_limiter_backend.get_battery_info()
+        self.info = info
+
+        laptop = info.get("laptop", {})
+        interface = info.get("interface", {})
         cap = info.get("capacity")
-        thresh = info.get("threshold")
+        thresh_display = info.get("threshold_display", "N/A")
         stat = info.get("status", "Unknown")
         svc = info.get("service_enabled", False)
         manufacturer = info.get("manufacturer", "")
         model = info.get("model", "")
+        bat_path = info.get("bat_path", "")
+        bat_name = os.path.basename(bat_path) if bat_path else "BAT"
+        cycles = info.get("cycle_count")
         can_write = info.get("can_write_direct", False)
         helper_ok = info.get("helper_installed", False)
         is_root = info.get("is_root", False)
+        ac_online = info.get("ac_online")
 
-        # Model label
-        self.model_lbl.set_text(f"{manufacturer} {model}".strip())
+        # Laptop & driver info
+        disp_name = laptop.get("display_name", "Linux Laptop")
+        driver_name = interface.get("driver_name", "Standard sysfs")
+        self.laptop_lbl.set_text(f"💻 {disp_name}")
+        self.driver_lbl.set_text(f"⚙️ Driver: {driver_name}")
+
+        # Battery details
+        details = f"🔋 Battery: {manufacturer} {model} ({bat_name})"
+        if cycles:
+            details += f"  •  Cycle Count: {cycles}"
+        if ac_online is True:
+            details += "  •  🔌 AC Connected"
+        elif ac_online is False:
+            details += "  •  🔋 On Battery Power"
+        self.bat_details_lbl.set_text(details)
 
         # Stats
         self.cap_lbl.set_text(f"{cap}%" if cap is not None else "N/A")
-        self.thresh_lbl.set_text(f"{thresh}%" if thresh is not None else "N/A")
+        self.thresh_lbl.set_text(thresh_display)
         self.status_lbl.set_text(stat)
         if cap is not None:
             self.level_bar.set_value(cap / 100.0)
@@ -373,40 +436,48 @@ class BatteryLimiterApp(Gtk.Window):
         if is_root or can_write:
             ctx2.add_class("notice-success")
             self.auth_lbl.set_text(
-                "✅ Ready: Direct sysfs write access confirmed. Limits apply immediately without a password."
+                "✅ Ready: Direct sysfs write access confirmed. Changes apply immediately."
             )
         elif helper_ok:
             ctx2.add_class("notice-info")
             self.auth_lbl.set_text(
-                "🔑 Helper installed: A graphical password prompt will appear when you apply a limit."
+                "🔑 Helper installed: A password prompt will appear when you apply a new limit."
             )
         else:
             ctx2.add_class("notice-warning")
             self.auth_lbl.set_text(
-                "⚠️ Not yet installed. Run:  sudo ./install.sh\n"
-                "This sets up a udev rule for passwordless control + the polkit helper."
+                "⚠️ First-time setup: Run 'sudo ./install.sh' in terminal to enable passwordless control."
             )
 
-        return True  # keep timeout running
+        return True
 
     # ── Event handlers ────────────────────────────────────────────────────────
 
-    def _on_preset(self, _btn, pct):
-        self.scale.set_value(pct)
-        self._update_selection(pct)
+    def _on_preset(self, _btn, val):
+        if self.scale:
+            self.scale.set_value(val)
+        self._update_selection(val)
 
     def _on_scale(self, scale):
         val = int(scale.get_value())
-        self.selected_target = val
-        self.slider_lbl.set_text(f"{val}%")
         self._update_selection(val)
 
     def _update_selection(self, val):
         self.selected_target = val
-        self.slider_lbl.set_text(f"{val}%")
-        for pct, btn in self.preset_widgets.items():
+        if hasattr(self, "slider_lbl") and self.slider_lbl:
+            self.slider_lbl.set_text(f"{val}%")
+
+        closest_preset = None
+        min_diff = 999
+        for pval in self.preset_widgets.keys():
+            diff = abs(pval - val)
+            if diff < min_diff:
+                min_diff = diff
+                closest_preset = pval
+
+        for pval, btn in self.preset_widgets.items():
             ctx = btn.get_style_context()
-            if pct == val:
+            if pval == val or (min_diff <= 10 and pval == closest_preset):
                 ctx.add_class("preset-card-selected")
             else:
                 ctx.remove_class("preset-card-selected")
@@ -431,36 +502,32 @@ class BatteryLimiterApp(Gtk.Window):
         GLib.timeout_add(800, self.refresh_status)
 
     def _apply_limit(self, target):
-        """Try all available auth strategies in order.
-        Always prefer the root helper (pkexec) so the systemd service
-        is created for reboot persistence alongside the sysfs write.
-        """
+        """Try root helper (pkexec) -> direct write -> pkexec python -> terminal sudo."""
         info = battery_limiter_backend.get_battery_info()
 
-        # 1. Root helper via pkexec — does sysfs write + systemd persistence in one shot
+        # 1. Root helper via pkexec
         if info.get("helper_installed"):
             result = self._try_pkexec_helper(target)
             if result[0] or result[1] == "Authentication cancelled.":
                 return result
-            # pkexec failed for a non-cancel reason, fall through
 
-        # 2. If running as root already, write directly
+        # 2. Direct write if already root
         if info.get("is_root"):
             return battery_limiter_backend.apply_limit(target)
 
-        # 3. Direct write (udev plugdev rule active) — no persistence
+        # 3. Direct write if plugdev udev rule is active
         if info.get("can_write_direct"):
             ok, msg = battery_limiter_backend.apply_limit(target)
             if ok:
-                msg += "\n⚠️ Reboot persistence could not be set (run 'sudo ./install.sh' once to enable it)."
+                msg += "\n💡 Direct write successful! (Run 'sudo ./install.sh' once to enable systemd reboot persistence)."
             return ok, msg
 
-        # 4. pkexec python backend (fallback)
+        # 4. Fallback pkexec python backend
         result = self._try_pkexec_python(target)
         if result[0]:
             return result
 
-        # 5. Terminal sudo as last resort
+        # 5. Terminal sudo fallback
         return self._try_terminal_sudo(target)
 
     def _try_pkexec_helper(self, target):

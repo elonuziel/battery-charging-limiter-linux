@@ -1,8 +1,37 @@
-# Battery Charge Limiter - udev rule for ASUS UX331UA and compatible laptops
-# Grants the 'plugdev' group write access to the battery charge threshold sysfs node.
+# Battery Charge Limiter - Universal udev rules
+# Grants the 'plugdev' group write access to battery charge threshold / conservation mode sysfs nodes.
 # This enables passwordless charging limit changes for users in the plugdev group.
-# Runs on every boot/resume when the battery device is registered.
 
-SUBSYSTEM=="power_supply", KERNEL=="BAT[0-9]", ATTR{type}=="Battery", \
-  RUN+="/bin/chmod g+w /sys%p/charge_control_end_threshold", \
-  RUN+="/bin/chgrp plugdev /sys%p/charge_control_end_threshold"
+# 1. Standard Linux power_supply charge thresholds (ASUS, ThinkPad, Dell, Framework, System76, MSI, Toshiba)
+SUBSYSTEM=="power_supply", ATTR{type}=="Battery", \
+  RUN+="/bin/chmod g+w /sys%p/charge_control_end_threshold /sys%p/charge_control_start_threshold /sys%p/charge_stop_threshold /sys%p/charge_start_threshold /sys%p/charge_control_limit_max", \
+  RUN+="/bin/chgrp plugdev /sys%p/charge_control_end_threshold /sys%p/charge_control_start_threshold /sys%p/charge_stop_threshold /sys%p/charge_start_threshold /sys%p/charge_control_limit_max"
+
+# 2. Lenovo IdeaPad / ThinkBook / Yoga / Legion / Xiaoxin (ideapad_laptop / ideapad_acpi)
+SUBSYSTEM=="platform", KERNEL=="VPC2004*", \
+  RUN+="/bin/chmod g+w /sys%p/conservation_mode", \
+  RUN+="/bin/chgrp plugdev /sys%p/conservation_mode"
+
+SUBSYSTEM=="platform", DRIVER=="ideapad_acpi", \
+  RUN+="/bin/chmod g+w /sys%p/conservation_mode", \
+  RUN+="/bin/chgrp plugdev /sys%p/conservation_mode"
+
+# 3. LG Gram (lg_laptop)
+SUBSYSTEM=="platform", KERNEL=="lg-laptop", \
+  RUN+="/bin/chmod g+w /sys%p/battery_care_limit", \
+  RUN+="/bin/chgrp plugdev /sys%p/battery_care_limit"
+
+# 4. Samsung Laptops (samsung-laptop / samsung-galaxybook)
+SUBSYSTEM=="platform", KERNEL=="samsung*", \
+  RUN+="/bin/chmod g+w /sys%p/battery_life_extender", \
+  RUN+="/bin/chgrp plugdev /sys%p/battery_life_extender"
+
+# 5. Sony Vaio (sony-laptop)
+SUBSYSTEM=="platform", KERNEL=="sony-laptop", \
+  RUN+="/bin/chmod g+w /sys%p/battery_care_limiter", \
+  RUN+="/bin/chgrp plugdev /sys%p/battery_care_limiter"
+
+# 6. Huawei MateBook (huawei-wmi)
+SUBSYSTEM=="platform", KERNEL=="huawei-wmi", \
+  RUN+="/bin/chmod g+w /sys%p/charge_thresholds", \
+  RUN+="/bin/chgrp plugdev /sys%p/charge_thresholds"

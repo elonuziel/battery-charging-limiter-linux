@@ -1,9 +1,9 @@
 [Desktop Entry]
 Name=Battery Charge Limiter
 Comment=Protect laptop battery health by setting custom charge limit thresholds
-Exec=/usr/bin/env python3 /home/elon/Documents/GitHub/battery-charging-limiter-linux/battery_limiter_gui.py
+Exec=python3 battery_limiter_gui.py
 Icon=battery-good-charging
 Terminal=false
 Type=Application
 Categories=Settings;HardwareSettings;System;GTK;
-Keywords=battery;charge;limit;threshold;asus;laptop;health;
+Keywords=battery;charge;limit;threshold;lenovo;asus;dell;laptop;health;

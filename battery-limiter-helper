@@ -1,6 +1,6 @@
 #!/bin/bash
-# battery-limiter-helper - Root helper script for setting charge thresholds
-# Called by pkexec with the battery-limiter polkit policy
+# battery-limiter-helper - Universal Root Helper for Battery Charging Limiter
+# Called by pkexec with com.battery.limiter.set polkit policy or directly by root
 # Usage: battery-limiter-helper set <limit>
 
 set -e
@@ -21,21 +21,95 @@ fi
 SYSTEMD_SERVICE="/etc/systemd/system/battery-manager.service"
 APPLIED=0
 
-# Apply to all battery threshold files
-for THRESH_FILE in /sys/class/power_supply/BAT*/charge_control_end_threshold; do
+# 1. Standard Linux power_supply charge thresholds (ASUS, ThinkPad, Dell, Framework, System76, MSI, Toshiba, etc.)
+for THRESH_FILE in /sys/class/power_supply/*/charge_control_end_threshold \
+                   /sys/class/power_supply/*/charge_stop_threshold \
+                   /sys/class/power_supply/macsmc-battery/charge_control_limit_max; do
     if [ -f "$THRESH_FILE" ]; then
-        echo "$LIMIT" > "$THRESH_FILE"
-        echo "Applied limit $LIMIT% to $THRESH_FILE"
-        APPLIED=$((APPLIED + 1))
+        if echo "$LIMIT" > "$THRESH_FILE" 2>/dev/null; then
+            echo "Applied limit ${LIMIT}% to $THRESH_FILE"
+            APPLIED=$((APPLIED + 1))
+        fi
+    fi
+done
+
+# 2. Lenovo IdeaPad / ThinkBook / Yoga / Legion / Xiaoxin (conservation_mode: 1 for ~60-80%, 0 for 100%)
+CONV_VAL=$([ "$LIMIT" -le 80 ] && echo 1 || echo 0)
+for CONV_FILE in /sys/bus/platform/drivers/ideapad_acpi/*/conservation_mode \
+                 /sys/bus/platform/drivers/ideapad_laptop/*/conservation_mode \
+                 /sys/bus/platform/devices/VPC2004*/conservation_mode \
+                 /sys/devices/platform/VPC2004*/conservation_mode; do
+    if [ -f "$CONV_FILE" ]; then
+        if echo "$CONV_VAL" > "$CONV_FILE" 2>/dev/null; then
+            echo "Applied Lenovo conservation_mode=$CONV_VAL to $CONV_FILE"
+            APPLIED=$((APPLIED + 1))
+        fi
+    fi
+done
+
+# 3. LG Gram (battery_care_limit: 80 or 100)
+LG_VAL=$([ "$LIMIT" -le 80 ] && echo 80 || echo 100)
+for LG_FILE in /sys/devices/platform/lg-laptop/battery_care_limit \
+               /sys/bus/platform/drivers/lg-laptop/*/battery_care_limit \
+               /sys/bus/platform/devices/lg-laptop/battery_care_limit; do
+    if [ -f "$LG_FILE" ]; then
+        if echo "$LG_VAL" > "$LG_FILE" 2>/dev/null; then
+            echo "Applied LG battery_care_limit=$LG_VAL to $LG_FILE"
+            APPLIED=$((APPLIED + 1))
+        fi
+    fi
+done
+
+# 4. Samsung Laptops (battery_life_extender: 1 for 80%, 0 for 100%)
+SAMS_VAL=$([ "$LIMIT" -le 80 ] && echo 1 || echo 0)
+for SAMS_FILE in /sys/devices/platform/samsung*/battery_life_extender \
+                 /sys/bus/platform/drivers/samsung*/battery_life_extender \
+                 /sys/bus/platform/devices/samsung*/battery_life_extender; do
+    if [ -f "$SAMS_FILE" ]; then
+        if echo "$SAMS_VAL" > "$SAMS_FILE" 2>/dev/null; then
+            echo "Applied Samsung battery_life_extender=$SAMS_VAL to $SAMS_FILE"
+            APPLIED=$((APPLIED + 1))
+        fi
+    fi
+done
+
+# 5. Sony Vaio (battery_care_limiter: 0=100, 50=50, 80=80)
+SONY_VAL=$([ "$LIMIT" -le 50 ] && echo 50 || ([ "$LIMIT" -le 80 ] && echo 80 || echo 0))
+for SONY_FILE in /sys/devices/platform/sony-laptop/battery_care_limiter \
+                 /sys/bus/platform/devices/sony-laptop/battery_care_limiter; do
+    if [ -f "$SONY_FILE" ]; then
+        if echo "$SONY_VAL" > "$SONY_FILE" 2>/dev/null; then
+            echo "Applied Sony battery_care_limiter=$SONY_VAL to $SONY_FILE"
+            APPLIED=$((APPLIED + 1))
+        fi
+    fi
+done
+
+# 6. Huawei MateBook (charge_thresholds)
+if [ "$LIMIT" -le 70 ]; then
+    HW_VAL="40 70"
+elif [ "$LIMIT" -le 80 ]; then
+    HW_VAL="70 80"
+else
+    HW_VAL="95 100"
+fi
+for HW_FILE in /sys/devices/platform/huawei-wmi/charge_thresholds \
+               /sys/bus/platform/drivers/huawei-wmi/*/charge_thresholds \
+               /sys/bus/platform/devices/huawei-wmi/charge_thresholds; do
+    if [ -f "$HW_FILE" ]; then
+        if echo "$HW_VAL" > "$HW_FILE" 2>/dev/null; then
+            echo "Applied Huawei charge_thresholds=\"$HW_VAL\" to $HW_FILE"
+            APPLIED=$((APPLIED + 1))
+        fi
     fi
 done
 
 if [ "$APPLIED" -eq 0 ]; then
-    echo "Error: No battery charge_control_end_threshold found in sysfs." >&2
+    echo "Error: No supported battery charge limiter interface found in sysfs." >&2
     exit 1
 fi
 
-# Write systemd service for reboot persistence
+# Write systemd service for reboot persistence across reboots, suspends, hibernates
 cat > "$SYSTEMD_SERVICE" << EOF
 [Unit]
 Description=Set battery charge threshold on boot and resume
@@ -43,14 +117,14 @@ After=multi-user.target suspend.target hibernate.target hybrid-sleep.target susp
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash -c 'for f in /sys/class/power_supply/BAT*/charge_control_end_threshold; do echo $LIMIT > "\$f"; done'
+ExecStart=/bin/bash -c 'for f in /sys/class/power_supply/*/charge_control_end_threshold /sys/class/power_supply/*/charge_stop_threshold /sys/class/power_supply/macsmc-battery/charge_control_limit_max; do [ -f "\$f" ] && echo $LIMIT > "\$f" || true; done; for f in /sys/bus/platform/drivers/ideapad_acpi/*/conservation_mode /sys/bus/platform/drivers/ideapad_laptop/*/conservation_mode /sys/bus/platform/devices/VPC2004*/conservation_mode /sys/devices/platform/VPC2004*/conservation_mode; do [ -f "\$f" ] && echo $CONV_VAL > "\$f" || true; done; for f in /sys/devices/platform/lg-laptop/battery_care_limit /sys/bus/platform/drivers/lg-laptop/*/battery_care_limit /sys/bus/platform/devices/lg-laptop/battery_care_limit; do [ -f "\$f" ] && echo $LG_VAL > "\$f" || true; done; for f in /sys/devices/platform/samsung*/battery_life_extender /sys/bus/platform/drivers/samsung*/battery_life_extender /sys/bus/platform/devices/samsung*/battery_life_extender; do [ -f "\$f" ] && echo $SAMS_VAL > "\$f" || true; done; for f in /sys/devices/platform/sony-laptop/battery_care_limiter /sys/bus/platform/devices/sony-laptop/battery_care_limiter; do [ -f "\$f" ] && echo $SONY_VAL > "\$f" || true; done; for f in /sys/devices/platform/huawei-wmi/charge_thresholds /sys/bus/platform/drivers/huawei-wmi/*/charge_thresholds /sys/bus/platform/devices/huawei-wmi/charge_thresholds; do [ -f "\$f" ] && echo "$HW_VAL" > "\$f" || true; done'
 
 [Install]
 WantedBy=multi-user.target suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target
 EOF
 
-systemctl daemon-reload
-systemctl enable battery-manager.service
+systemctl daemon-reload 2>/dev/null || true
+systemctl enable battery-manager.service 2>/dev/null || true
 systemctl start battery-manager.service 2>/dev/null || true
 
-echo "Successfully set charge limit to ${LIMIT}% and enabled systemd reboot persistence!"
+echo "Successfully set battery charge threshold ($LIMIT%) and enabled reboot persistence!"
