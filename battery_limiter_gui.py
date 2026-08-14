@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
 Battery Charge Limiter GUI for Linux (GTK 3).
-Universal support for Lenovo (ThinkBook, IdeaPad, Legion, Yoga, ThinkPad),
-ASUS, Dell, LG Gram, Samsung, Huawei, Framework, System76, Sony, MSI, and Linux 5.4+ laptops.
+A modern, beautiful, and intuitive battery threshold manager with:
+- Dark and Light theme support with instant toggle & persistence
+- Universal support for Lenovo, ASUS, Dell, LG Gram, Samsung, Huawei, Framework, System76, Sony, MSI, Apple Silicon
 """
 
 import sys
 import os
+import json
 import subprocess
 
 import gi
@@ -16,127 +18,549 @@ from gi.repository import Gtk, Gdk, GLib
 import battery_limiter_backend
 
 HELPER_PATH = "/usr/local/bin/battery-limiter-helper"
+CONFIG_DIR = os.path.expanduser("~/.config/battery-limiter")
+CONFIG_PATH = os.path.join(CONFIG_DIR, "config.json")
 
-CSS_STYLES = b"""
+
+def load_config():
+    """Loads user configuration (such as theme preference)."""
+    if os.path.exists(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"theme": "dark"}
+
+
+def save_config(cfg):
+    """Saves user configuration."""
+    try:
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2)
+    except Exception as e:
+        print(f"Notice: Could not save config: {e}", file=sys.stderr)
+
+
+CSS_DARK = b"""
 * {
-    font-family: "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", sans-serif;
+    color: #f1f5f9;
 }
-window.main-window {
-    background-color: #181825;
-    color: #cdd6f4;
+window, window.background {
+    background-color: #0d121d;
+    color: #f1f5f9;
 }
-.header-title {
-    font-size: 20px;
-    font-weight: 800;
-    color: #cdd6f4;
+scrolledwindow, viewport {
+    background-color: #0d121d;
+    border: none;
 }
-.header-subtitle {
-    font-size: 12px;
-    color: #a6adc8;
+box, grid {
+    background-color: transparent;
 }
+label {
+    color: #f1f5f9;
+    text-shadow: none;
+}
+
+/* Card surfaces */
 .card {
-    background-color: #1e1e2e;
+    background-color: #141b29;
     border-radius: 12px;
     padding: 14px 16px;
-    border: 1px solid #313244;
+    border: 1px solid #232e42;
 }
 .hardware-card {
-    background-color: #161622;
-    border-radius: 10px;
-    padding: 10px 14px;
-    border: 1px solid #2d2e40;
+    background-color: #101622;
+    border-radius: 12px;
+    padding: 12px 14px;
+    border: 1px solid #1e2838;
 }
 .hw-label {
     font-size: 11px;
     font-weight: 700;
-    color: #89b4fa;
+    color: #38bdf8;
 }
 .hw-value {
-    font-size: 12px;
-    color: #cdd6f4;
-}
-.card-title {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
-    color: #cdd6f4;
+    color: #ffffff;
 }
-.status-value {
-    font-size: 26px;
+.hw-sub {
+    font-size: 11px;
+    color: #94a3b8;
+}
+.header-title {
+    font-size: 20px;
     font-weight: 800;
-    color: #89b4fa;
+    color: #ffffff;
 }
-.status-label {
+.header-subtitle {
     font-size: 11px;
-    color: #a6adc8;
+    color: #94a3b8;
 }
-.badge {
-    border-radius: 20px;
-    padding: 3px 10px;
+.section-heading {
+    font-size: 12px;
     font-weight: 700;
-    font-size: 11px;
+    color: #e2e8f0;
 }
-.badge-success { background-color: #1c4a2f; color: #a6e3a1; }
-.badge-warning { background-color: #4a3a1c; color: #f9e2af; }
-.badge-info    { background-color: #1d3557; color: #89b4fa; }
-.badge-error   { background-color: #42202b; color: #f38ba8; }
+.status-val-big {
+    font-size: 34px;
+    font-weight: 800;
+    color: #38bdf8;
+}
+.status-meta-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: #64748b;
+}
+.status-meta-val {
+    font-size: 13px;
+    font-weight: 700;
+    color: #ffffff;
+}
 
+/* All Buttons Uniform Dark Reset */
+button {
+    background-color: #141b29;
+    background-image: none;
+    box-shadow: none;
+    text-shadow: none;
+    border: 1px solid #232e42;
+    border-radius: 8px;
+    color: #f1f5f9;
+}
+button label {
+    color: #f1f5f9;
+    text-shadow: none;
+}
+button:hover {
+    background-color: #1d273b;
+    border-color: #38bdf8;
+}
+
+/* Preset Cards */
 .preset-card {
-    background-color: #1e1e2e;
+    background-color: #101622;
+    border: 2px solid #1e2838;
     border-radius: 12px;
-    border: 2px solid #313244;
     padding: 12px 14px;
-    transition: all 150ms ease-in-out;
 }
 .preset-card:hover {
-    border-color: #585b70;
-    background-color: #252538;
+    background-color: #192336;
+    border-color: #38bdf8;
 }
 .preset-card-selected {
-    border-color: #89b4fa;
-    background-color: #19263e;
+    background-color: #0b2545;
+    border-color: #38bdf8;
 }
 .preset-title {
     font-size: 13px;
     font-weight: 700;
-    color: #89b4fa;
+    color: #38bdf8;
 }
-.preset-subtitle {
+.preset-desc {
     font-size: 11px;
-    color: #bac2de;
-    line-height: 1.3;
+    color: #94a3b8;
 }
-.btn-primary {
-    background: linear-gradient(135deg, #89b4fa, #74c7ec);
-    color: #11111b;
+
+/* Slider & Pills */
+.slider-val-label {
+    font-size: 20px;
+    font-weight: 800;
+    color: #38bdf8;
+}
+.btn-pill {
+    background-color: #101622;
+    border: 1px solid #232e42;
+    border-radius: 6px;
+    padding: 6px 10px;
+}
+.btn-pill label {
+    color: #cbd5e1;
+    font-size: 11px;
+    font-weight: 600;
+}
+.btn-pill:hover {
+    background-color: #1d273b;
+    border-color: #38bdf8;
+}
+.btn-pill-active {
+    background-color: #0284c7;
+    border-color: #38bdf8;
+}
+.btn-pill-active label {
+    color: #ffffff;
     font-weight: 700;
-    font-size: 13px;
+}
+
+/* Primary Apply Button */
+.btn-primary {
+    background-color: #0284c7;
+    border: 1px solid #38bdf8;
     border-radius: 10px;
-    padding: 11px 22px;
-    border: none;
+    padding: 12px 20px;
+}
+.btn-primary label {
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 700;
 }
 .btn-primary:hover {
-    background: linear-gradient(135deg, #b4befe, #89b4fa);
+    background-color: #0369a1;
 }
+
+/* Secondary Button */
 .btn-secondary {
-    background-color: #313244;
-    color: #cdd6f4;
-    font-weight: 600;
-    font-size: 12px;
+    background-color: #141b29;
+    border: 1px solid #232e42;
     border-radius: 8px;
     padding: 6px 12px;
-    border: none;
 }
-.btn-secondary:hover { background-color: #45475a; }
+.btn-secondary label {
+    color: #cbd5e1;
+    font-size: 11px;
+    font-weight: 600;
+}
+.btn-secondary:hover {
+    background-color: #1d273b;
+    border-color: #38bdf8;
+}
 
+/* Badges */
+.badge {
+    border-radius: 12px;
+    padding: 3px 10px;
+    font-size: 10px;
+    font-weight: 700;
+}
+.badge-success { background-color: #064e3b; color: #6ee7b7; border: 1px solid #047857; }
+.badge-warning { background-color: #78350f; color: #fde68a; border: 1px solid #b45309; }
+.badge-info    { background-color: #0c4a6e; color: #7dd3fc; border: 1px solid #0369a1; }
+.badge-error   { background-color: #45131e; color: #fca5a5; border: 1px solid #991b1b; }
+
+/* Notice Box */
 .notice-box {
     border-radius: 10px;
-    padding: 9px 13px;
+    padding: 10px 14px;
     font-size: 12px;
 }
-.notice-info    { background-color: #1a2a3e; border: 1px solid #2a4060; color: #89b4fa; }
-.notice-success { background-color: #1c3a27; border: 1px solid #2e5c3e; color: #a6e3a1; }
-.notice-warning { background-color: #3a2e1c; border: 1px solid #5c4a2e; color: #f9e2af; }
-.notice-error   { background-color: #42202b; border: 1px solid #6c2e3d; color: #f38ba8; }
+.notice-info    { background-color: #082f49; border: 1px solid #0369a1; color: #7dd3fc; }
+.notice-success { background-color: #064e3b; border: 1px solid #047857; color: #86efac; }
+.notice-warning { background-color: #451a03; border: 1px solid #78350f; color: #fde047; }
+.notice-error   { background-color: #45131e; border: 1px solid #991b1b; color: #fca5a5; }
+
+.info-tip {
+    font-size: 11px;
+    color: #94a3b8;
+}
+
+/* Scale styling */
+scale trough {
+    background-color: #1e2838;
+    border-radius: 6px;
+    min-height: 8px;
+    border: none;
+}
+scale highlight {
+    background-color: #0284c7;
+    border-radius: 6px;
+}
+scale slider {
+    background-color: #38bdf8;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    min-width: 18px;
+    min-height: 18px;
+}
+
+/* LevelBar styling */
+levelbar trough {
+    background-color: #1e2838;
+    border-radius: 6px;
+    padding: 2px;
+    min-height: 10px;
+}
+levelbar block {
+    background-color: #0284c7;
+    border-radius: 4px;
+}
+levelbar block.filled {
+    background-color: #38bdf8;
+}
+levelbar block.empty {
+    background-color: #1e2838;
+}
+levelbar block.full {
+    background-color: #10b981;
+}
+levelbar block.high {
+    background-color: #38bdf8;
+}
+levelbar block.low {
+    background-color: #f59e0b;
+}
+"""
+
+CSS_LIGHT = b"""
+* {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", sans-serif;
+    color: #0f172a;
+}
+window, window.background {
+    background-color: #f1f5f9;
+    color: #0f172a;
+}
+scrolledwindow, viewport {
+    background-color: #f1f5f9;
+    border: none;
+}
+box, grid {
+    background-color: transparent;
+}
+label {
+    color: #0f172a;
+    text-shadow: none;
+}
+
+/* Card surfaces */
+.card {
+    background-color: #ffffff;
+    border-radius: 12px;
+    padding: 14px 16px;
+    border: 1px solid #cbd5e1;
+}
+.hardware-card {
+    background-color: #f8fafc;
+    border-radius: 12px;
+    padding: 12px 14px;
+    border: 1px solid #cbd5e1;
+}
+.hw-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #0284c7;
+}
+.hw-value {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f172a;
+}
+.hw-sub {
+    font-size: 11px;
+    color: #475569;
+}
+.header-title {
+    font-size: 20px;
+    font-weight: 800;
+    color: #0f172a;
+}
+.header-subtitle {
+    font-size: 11px;
+    color: #475569;
+}
+.section-heading {
+    font-size: 12px;
+    font-weight: 700;
+    color: #334155;
+}
+.status-val-big {
+    font-size: 34px;
+    font-weight: 800;
+    color: #0284c7;
+}
+.status-meta-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: #64748b;
+}
+.status-meta-val {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+/* Buttons in Light Theme */
+button {
+    background-color: #ffffff;
+    background-image: none;
+    box-shadow: none;
+    text-shadow: none;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    color: #0f172a;
+}
+button label {
+    color: #0f172a;
+    text-shadow: none;
+}
+button:hover {
+    background-color: #f1f5f9;
+    border-color: #0284c7;
+}
+
+/* Preset Cards */
+.preset-card {
+    background-color: #ffffff;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px 14px;
+}
+.preset-card:hover {
+    background-color: #f8fafc;
+    border-color: #0284c7;
+}
+.preset-card-selected {
+    background-color: #e0f2fe;
+    border-color: #0284c7;
+}
+.preset-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0284c7;
+}
+.preset-desc {
+    font-size: 11px;
+    color: #475569;
+}
+
+/* Slider & Pills */
+.slider-val-label {
+    font-size: 20px;
+    font-weight: 800;
+    color: #0284c7;
+}
+.btn-pill {
+    background-color: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 6px 10px;
+}
+.btn-pill label {
+    color: #334155;
+    font-size: 11px;
+    font-weight: 600;
+}
+.btn-pill:hover {
+    background-color: #f1f5f9;
+    border-color: #0284c7;
+}
+.btn-pill-active {
+    background-color: #0284c7;
+    border-color: #0369a1;
+}
+.btn-pill-active label {
+    color: #ffffff;
+    font-weight: 700;
+}
+
+/* Primary Apply Button */
+.btn-primary {
+    background-color: #0284c7;
+    border: 1px solid #0369a1;
+    border-radius: 10px;
+    padding: 12px 20px;
+}
+.btn-primary label {
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 700;
+}
+.btn-primary:hover {
+    background-color: #0369a1;
+}
+
+/* Secondary Button */
+.btn-secondary {
+    background-color: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 6px 12px;
+}
+.btn-secondary label {
+    color: #334155;
+    font-size: 11px;
+    font-weight: 600;
+}
+.btn-secondary:hover {
+    background-color: #f1f5f9;
+    border-color: #0284c7;
+}
+
+/* Badges */
+.badge {
+    border-radius: 12px;
+    padding: 3px 10px;
+    font-size: 10px;
+    font-weight: 700;
+}
+.badge-success { background-color: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+.badge-warning { background-color: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+.badge-info    { background-color: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; }
+.badge-error   { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+
+/* Notice Box */
+.notice-box {
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 12px;
+}
+.notice-info    { background-color: #e0f2fe; border: 1px solid #7dd3fc; color: #0369a1; }
+.notice-success { background-color: #dcfce7; border: 1px solid #86efac; color: #15803d; }
+.notice-warning { background-color: #fef3c7; border: 1px solid #fde68a; color: #b45309; }
+.notice-error   { background-color: #fee2e2; border: 1px solid #fca5a5; color: #b91c1c; }
+
+.info-tip {
+    font-size: 11px;
+    color: #475569;
+}
+
+/* Scale styling */
+scale trough {
+    background-color: #cbd5e1;
+    border-radius: 6px;
+    min-height: 8px;
+    border: none;
+}
+scale highlight {
+    background-color: #0284c7;
+    border-radius: 6px;
+}
+scale slider {
+    background-color: #0284c7;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    min-width: 18px;
+    min-height: 18px;
+}
+
+/* LevelBar styling */
+levelbar trough {
+    background-color: #e2e8f0;
+    border-radius: 6px;
+    padding: 2px;
+    min-height: 10px;
+}
+levelbar block {
+    background-color: #0284c7;
+    border-radius: 4px;
+}
+levelbar block.filled {
+    background-color: #0284c7;
+}
+levelbar block.empty {
+    background-color: #e2e8f0;
+}
+levelbar block.full {
+    background-color: #10b981;
+}
+levelbar block.high {
+    background-color: #0284c7;
+}
+levelbar block.low {
+    background-color: #f59e0b;
+}
 """
 
 
@@ -172,27 +596,63 @@ def create_desktop_shortcut():
 class BatteryLimiterApp(Gtk.Window):
     def __init__(self):
         super().__init__(title="Battery Charge Limiter")
-        self.set_default_size(540, 780)
+        self.set_default_size(560, 820)
         self.set_resizable(False)
         self.set_position(Gtk.WindowPosition.CENTER)
         self.get_style_context().add_class("main-window")
 
-        provider = Gtk.CssProvider()
-        provider.load_from_data(CSS_STYLES)
-        Gtk.StyleContext.add_provider_for_screen(
-            Gdk.Screen.get_default(), provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
+        # Load persisted configuration (theme preference)
+        self.config = load_config()
+        self.current_theme = self.config.get("theme", "dark")
+        self.css_provider = Gtk.CssProvider()
+
+        self._apply_theme(self.current_theme)
 
         self.info = battery_limiter_backend.get_battery_info()
-        self.selected_target = self.info.get("threshold") or 80
+        self.selected_target = self.info.get("threshold") or 60
         self.preset_widgets = {}
-        self.slider_card = None
-        self.scale = None
+        self.pill_buttons = {}
 
         self.build_ui()
         self.refresh_status()
         GLib.timeout_add_seconds(3, self.refresh_status)
+
+    def _apply_theme(self, theme_name):
+        """Applies dark or light theme CSS and updates GTK window settings."""
+        self.current_theme = theme_name
+        settings = Gtk.Settings.get_default()
+        if settings:
+            settings.set_property("gtk-application-prefer-dark-theme", (theme_name == "dark"))
+
+        css_data = CSS_DARK if theme_name == "dark" else CSS_LIGHT
+        try:
+            self.css_provider.load_from_data(css_data)
+            screen = Gdk.Screen.get_default()
+            if screen:
+                Gtk.StyleContext.add_provider_for_screen(
+                    screen, self.css_provider,
+                    Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+                )
+        except Exception as e:
+            print(f"Notice: CSS styling note: {e}", file=sys.stderr)
+
+        if hasattr(self, "theme_btn"):
+            if theme_name == "dark":
+                self.theme_btn.set_label("☀️ Light Mode")
+                self.theme_btn.set_tooltip_text("Switch to Light Theme")
+            else:
+                self.theme_btn.set_label("🌙 Dark Mode")
+                self.theme_btn.set_tooltip_text("Switch to Dark Theme")
+
+        if hasattr(self, "selected_target"):
+            self._update_selection(self.selected_target)
+
+    def toggle_theme(self):
+        """Toggles between dark and light themes and persists preference."""
+        new_theme = "light" if self.current_theme == "dark" else "dark"
+        self._apply_theme(new_theme)
+        self.config["theme"] = new_theme
+        save_config(self.config)
 
     def build_ui(self):
         scroll = Gtk.ScrolledWindow()
@@ -206,67 +666,82 @@ class BatteryLimiterApp(Gtk.Window):
         root.set_margin_right(20)
         scroll.add(root)
 
-        # Header
+        # ── 1. Header ────────────────────────────────────────────────────────
         hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         hdr_txt = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         ttl = Gtk.Label(label="⚡ Battery Charge Limiter", xalign=0)
         ttl.get_style_context().add_class("header-title")
         sub = Gtk.Label(
-            label="Prolong battery lifespan by capping maximum charge percentage",
+            label="Extend battery lifespan with smart charge threshold management",
             xalign=0, wrap=True
         )
         sub.get_style_context().add_class("header-subtitle")
         hdr_txt.pack_start(ttl, False, False, 0)
         hdr_txt.pack_start(sub, False, False, 0)
 
-        shortcut_btn = Gtk.Button(label="📌 Desktop Icon")
+        hdr_btns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+
+        # Theme Switcher button
+        theme_label = "☀️ Light Mode" if self.current_theme == "dark" else "🌙 Dark Mode"
+        self.theme_btn = Gtk.Button(label=theme_label)
+        self.theme_btn.get_style_context().add_class("btn-secondary")
+        self.theme_btn.set_tooltip_text("Toggle Dark / Light Theme")
+        self.theme_btn.connect("clicked", lambda _: self.toggle_theme())
+
+        # Refresh button
+        refresh_btn = Gtk.Button(label="🔄")
+        refresh_btn.get_style_context().add_class("btn-secondary")
+        refresh_btn.set_tooltip_text("Refresh battery status")
+        refresh_btn.connect("clicked", lambda _: self.refresh_status())
+
+        # Shortcut button
+        shortcut_btn = Gtk.Button(label="📌 Desktop")
         shortcut_btn.get_style_context().add_class("btn-secondary")
+        shortcut_btn.set_tooltip_text("Create a Desktop shortcut")
         shortcut_btn.connect("clicked", lambda _: self._do_desktop_shortcut())
 
+        hdr_btns.pack_start(self.theme_btn, False, False, 0)
+        hdr_btns.pack_start(refresh_btn, False, False, 0)
+        hdr_btns.pack_start(shortcut_btn, False, False, 0)
+
         hdr.pack_start(hdr_txt, True, True, 0)
-        hdr.pack_end(shortcut_btn, False, False, 0)
+        hdr.pack_end(hdr_btns, False, False, 0)
         root.pack_start(hdr, False, False, 0)
 
-        # Detected Hardware Card
-        hw_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        # ── 2. Detected Hardware Card ────────────────────────────────────────
+        hw_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         hw_card.get_style_context().add_class("hardware-card")
 
+        hw_top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self.laptop_lbl = Gtk.Label(label="", xalign=0)
         self.laptop_lbl.get_style_context().add_class("hw-value")
-        self.driver_lbl = Gtk.Label(label="", xalign=0)
-        self.driver_lbl.get_style_context().add_class("hw-label")
+        self.driver_badge = Gtk.Label(label="")
+        self.driver_badge.get_style_context().add_class("badge")
+        self.driver_badge.get_style_context().add_class("badge-info")
+        hw_top.pack_start(self.laptop_lbl, True, True, 0)
+        hw_top.pack_end(self.driver_badge, False, False, 0)
+        hw_card.pack_start(hw_top, False, False, 0)
 
-        hw_card.pack_start(self.laptop_lbl, False, False, 0)
-        hw_card.pack_start(self.driver_lbl, False, False, 0)
+        self.bat_sub_lbl = Gtk.Label(label="", xalign=0)
+        self.bat_sub_lbl.get_style_context().add_class("hw-sub")
+        hw_card.pack_start(self.bat_sub_lbl, False, False, 0)
+
         root.pack_start(hw_card, False, False, 0)
 
-        # Auth / install status notice
-        self.auth_notice = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        self.auth_notice.get_style_context().add_class("notice-box")
-        self.auth_lbl = Gtk.Label(label="", xalign=0)
-        self.auth_lbl.set_line_wrap(True)
-        self.auth_notice.pack_start(self.auth_lbl, False, False, 0)
-        root.pack_start(self.auth_notice, False, False, 0)
-
-        # Battery live status card
+        # ── 3. Live Battery Status Card ──────────────────────────────────────
         status_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         status_card.get_style_context().add_class("card")
 
         status_hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        status_title = Gtk.Label(label="Live Battery & Limit Status", xalign=0)
-        status_title.get_style_context().add_class("card-title")
+        sec_title = Gtk.Label(label="Live Battery & Threshold Status", xalign=0)
+        sec_title.get_style_context().add_class("section-heading")
         self.service_badge = Gtk.Label(label="")
         self.service_badge.get_style_context().add_class("badge")
-        status_hdr.pack_start(status_title, True, True, 0)
+        status_hdr.pack_start(sec_title, True, True, 0)
         status_hdr.pack_end(self.service_badge, False, False, 0)
         status_card.pack_start(status_hdr, False, False, 0)
 
-        # Battery details line
-        self.bat_details_lbl = Gtk.Label(label="", xalign=0)
-        self.bat_details_lbl.get_style_context().add_class("header-subtitle")
-        status_card.pack_start(self.bat_details_lbl, False, False, 0)
-
-        # Stats grid
+        # Grid stats
         grid = Gtk.Grid()
         grid.set_column_spacing(16)
         grid.set_row_spacing(4)
@@ -274,16 +749,25 @@ class BatteryLimiterApp(Gtk.Window):
 
         def stat_col(title, row=0, col=0):
             lbl = Gtk.Label(label=title, xalign=0)
-            lbl.get_style_context().add_class("status-label")
+            lbl.get_style_context().add_class("status-meta-title")
             val = Gtk.Label(label="--", xalign=0)
-            val.get_style_context().add_class("status-value")
+            val.get_style_context().add_class("status-meta-val")
             grid.attach(lbl, col, row, 1, 1)
             grid.attach(val, col, row + 1, 1, 1)
             return val
 
-        self.cap_lbl = stat_col("Current Level", col=0)
-        self.thresh_lbl = stat_col("Active Limit", col=1)
-        self.status_lbl = stat_col("Power State", col=2)
+        self.cap_val_lbl = Gtk.Label(label="--%", xalign=0)
+        self.cap_val_lbl.get_style_context().add_class("status-val-big")
+
+        cap_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        cap_title = Gtk.Label(label="CURRENT CHARGE", xalign=0)
+        cap_title.get_style_context().add_class("status-meta-title")
+        cap_box.pack_start(cap_title, False, False, 0)
+        cap_box.pack_start(self.cap_val_lbl, False, False, 0)
+        grid.attach(cap_box, 0, 0, 1, 2)
+
+        self.thresh_lbl = stat_col("ACTIVE LIMIT", col=1)
+        self.status_lbl = stat_col("POWER STATE", col=2)
 
         status_card.pack_start(grid, False, False, 0)
 
@@ -295,73 +779,87 @@ class BatteryLimiterApp(Gtk.Window):
 
         root.pack_start(status_card, False, False, 0)
 
-        # Presets Section
-        choose_lbl = Gtk.Label(label="Choose Charging Limit", xalign=0)
-        choose_lbl.get_style_context().add_class("card-title")
-        root.pack_start(choose_lbl, False, False, 0)
+        # ── 4. Target Threshold Presets ──────────────────────────────────────
+        choose_hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        choose_lbl = Gtk.Label(label="Choose Your Charge Limit", xalign=0)
+        choose_lbl.get_style_context().add_class("section-heading")
+        choose_hdr.pack_start(choose_lbl, True, True, 0)
+        root.pack_start(choose_hdr, False, False, 0)
 
-        interface = self.info.get("interface", {})
-        presets = interface.get("presets", [])
-        if not presets:
-            presets = [
-                {"value": 60, "label": "🌿 Maximum Lifespan (60%)", "desc": "Ideal for desk work with charger plugged in."},
-                {"value": 80, "label": "⚖️ Daily Balance (80%)", "desc": "Recommended. Best mix of longevity and mobile capacity."},
-                {"value": 100, "label": "✈️ Full Capacity (100%)", "desc": "For travel, flights, or off-grid usage."},
-            ]
+        presets = [
+            (60, "🌿 Maximum Lifespan  (60%)",
+             "Recommended for continuous AC power / desk use. Minimizes cell voltage stress & heat build-up."),
+            (80, "⚖️ Daily Balance  (80%)",
+             "Recommended for daily mixed use. Balances chemical longevity with sufficient mobile battery run-time."),
+            (100, "✈️ Full Capacity  (100%)",
+             "For travel, flights, or long off-grid work. Charges battery to 100% capacity."),
+        ]
 
         self.presets_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        for p in presets:
-            val = p["value"]
-            title = p["label"]
-            desc = p["desc"]
-
+        for val, title, desc in presets:
             btn = Gtk.Button()
             btn.get_style_context().add_class("preset-card")
             inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
             t = Gtk.Label(label=title, xalign=0)
             t.get_style_context().add_class("preset-title")
             d = Gtk.Label(label=desc, xalign=0)
-            d.get_style_context().add_class("preset-subtitle")
+            d.get_style_context().add_class("preset-desc")
             d.set_line_wrap(True)
             inner.pack_start(t, False, False, 0)
             inner.pack_start(d, False, False, 0)
             btn.add(inner)
-            btn.connect("clicked", self._on_preset, val)
+            btn.connect("clicked", self._on_preset_click, val)
             self.presets_box.pack_start(btn, False, False, 0)
             self.preset_widgets[val] = btn
 
         root.pack_start(self.presets_box, False, False, 0)
 
-        # Fine slider (if supported by driver)
-        if interface.get("supports_slider", True):
-            self.slider_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-            self.slider_card.get_style_context().add_class("card")
-            slider_hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-            slider_title = Gtk.Label(label="Custom Value Slider", xalign=0)
-            slider_title.get_style_context().add_class("card-title")
-            self.slider_lbl = Gtk.Label(label=f"{self.selected_target}%", xalign=1)
-            self.slider_lbl.get_style_context().add_class("preset-title")
-            slider_hdr.pack_start(slider_title, True, True, 0)
-            slider_hdr.pack_end(self.slider_lbl, False, False, 0)
-            self.slider_card.pack_start(slider_hdr, False, False, 0)
+        # ── 5. Fine Slider & Quick Select Pills ──────────────────────────────
+        slider_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        slider_card.get_style_context().add_class("card")
 
-            min_l = interface.get("min_limit", 20)
-            max_l = interface.get("max_limit", 100)
-            step = interface.get("step", 5)
-            self.scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, min_l, max_l, step)
-            self.scale.set_value(self.selected_target)
-            self.scale.set_draw_value(False)
-            self.scale.connect("value-changed", self._on_scale)
-            self.slider_card.pack_start(self.scale, False, False, 0)
-            root.pack_start(self.slider_card, False, False, 0)
+        slider_hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        slider_title = Gtk.Label(label="Precision Target & Custom Values", xalign=0)
+        slider_title.get_style_context().add_class("section-heading")
+        self.slider_lbl = Gtk.Label(label=f"{self.selected_target}%", xalign=1)
+        self.slider_lbl.get_style_context().add_class("slider-val-label")
+        slider_hdr.pack_start(slider_title, True, True, 0)
+        slider_hdr.pack_end(self.slider_lbl, False, False, 0)
+        slider_card.pack_start(slider_hdr, False, False, 0)
 
-        # Apply button
-        self.apply_btn = Gtk.Button(label="Apply Limit & Save (Persists on Reboot)")
+        # Quick select pill buttons
+        pills_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        pills_box.set_homogeneous(True)
+        for pval in [50, 60, 70, 80, 90, 100]:
+            pbtn = Gtk.Button(label=f"{pval}%")
+            pbtn.get_style_context().add_class("btn-pill")
+            pbtn.connect("clicked", self._on_pill_click, pval)
+            pills_box.pack_start(pbtn, True, True, 0)
+            self.pill_buttons[pval] = pbtn
+        slider_card.pack_start(pills_box, False, False, 0)
+
+        # Continuous scale
+        self.scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 50, 100, 5)
+        self.scale.set_value(self.selected_target)
+        self.scale.set_draw_value(False)
+        self.scale.connect("value-changed", self._on_scale_change)
+        slider_card.pack_start(self.scale, False, False, 0)
+
+        # Hardware explanatory tip
+        self.hw_tip_lbl = Gtk.Label(label="", xalign=0)
+        self.hw_tip_lbl.get_style_context().add_class("info-tip")
+        self.hw_tip_lbl.set_line_wrap(True)
+        slider_card.pack_start(self.hw_tip_lbl, False, False, 0)
+
+        root.pack_start(slider_card, False, False, 0)
+
+        # ── 6. Apply Button ──────────────────────────────────────────────────
+        self.apply_btn = Gtk.Button(label="⚡ Apply Limit & Save (Persists on Reboot)")
         self.apply_btn.get_style_context().add_class("btn-primary")
         self.apply_btn.connect("clicked", self._on_apply)
         root.pack_start(self.apply_btn, False, False, 0)
 
-        # Result feedback notice
+        # ── 7. Result Feedback Notice ────────────────────────────────────────
         self.result_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.result_box.get_style_context().add_class("notice-box")
         self.result_lbl = Gtk.Label(label="", xalign=0)
@@ -371,9 +869,17 @@ class BatteryLimiterApp(Gtk.Window):
         self.result_box.hide()
         root.pack_start(self.result_box, False, False, 0)
 
+        # ── 8. Auth notice (bottom) ──────────────────────────────────────────
+        self.auth_notice = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self.auth_notice.get_style_context().add_class("notice-box")
+        self.auth_lbl = Gtk.Label(label="", xalign=0)
+        self.auth_lbl.set_line_wrap(True)
+        self.auth_notice.pack_start(self.auth_lbl, False, False, 0)
+        root.pack_start(self.auth_notice, False, False, 0)
+
         self._update_selection(self.selected_target)
 
-    # ── Status refresh ────────────────────────────────────────────────────────
+    # ── Status Refresh ────────────────────────────────────────────────────────
 
     def refresh_status(self):
         info = battery_limiter_backend.get_battery_info()
@@ -395,24 +901,35 @@ class BatteryLimiterApp(Gtk.Window):
         is_root = info.get("is_root", False)
         ac_online = info.get("ac_online")
 
-        # Laptop & driver info
+        # Hardware display
         disp_name = laptop.get("display_name", "Linux Laptop")
-        driver_name = interface.get("driver_name", "Standard sysfs")
-        self.laptop_lbl.set_text(f"💻 {disp_name}")
-        self.driver_lbl.set_text(f"⚙️ Driver: {driver_name}")
+        driver_type = interface.get("type", "")
+        if driver_type == "conservation_mode":
+            driver_short = "Lenovo Conservation Mode (ideapad_laptop)"
+        elif driver_type == "percentage":
+            driver_short = "Standard sysfs (charge_control_end_threshold)"
+        elif driver_type == "lg_care":
+            driver_short = "LG Battery Care (lg_laptop)"
+        elif driver_type == "samsung_extender":
+            driver_short = "Samsung Extender"
+        else:
+            driver_short = interface.get("driver_name", "Hardware ACPI")
 
-        # Battery details
-        details = f"🔋 Battery: {manufacturer} {model} ({bat_name})"
+        self.laptop_lbl.set_text(f"💻 {disp_name}")
+        self.driver_badge.set_text(driver_short)
+
+        # Battery Subtitle
+        sub_text = f"🔋 {manufacturer} {model} ({bat_name})"
         if cycles:
-            details += f"  •  Cycle Count: {cycles}"
+            sub_text += f"   •   🔄 Cycle Count: {cycles}"
         if ac_online is True:
-            details += "  •  🔌 AC Connected"
+            sub_text += "   •   🔌 AC Charger Connected"
         elif ac_online is False:
-            details += "  •  🔋 On Battery Power"
-        self.bat_details_lbl.set_text(details)
+            sub_text += "   •   🔋 On Battery Power"
+        self.bat_sub_lbl.set_text(sub_text)
 
         # Stats
-        self.cap_lbl.set_text(f"{cap}%" if cap is not None else "N/A")
+        self.cap_val_lbl.set_text(f"{cap}%" if cap is not None else "--%")
         self.thresh_lbl.set_text(thresh_display)
         self.status_lbl.set_text(stat)
         if cap is not None:
@@ -423,7 +940,7 @@ class BatteryLimiterApp(Gtk.Window):
         for cls in ["badge-success", "badge-info", "badge-warning"]:
             ctx.remove_class(cls)
         if svc:
-            self.service_badge.set_text("✓ Persists on Reboot")
+            self.service_badge.set_text("✓ Persists on Boot & Sleep")
             ctx.add_class("badge-success")
         else:
             self.service_badge.set_text("No Boot Persistence")
@@ -436,12 +953,12 @@ class BatteryLimiterApp(Gtk.Window):
         if is_root or can_write:
             ctx2.add_class("notice-success")
             self.auth_lbl.set_text(
-                "✅ Ready: Direct sysfs write access confirmed. Changes apply immediately."
+                "✅ Direct Access: Settings will apply immediately without prompt."
             )
         elif helper_ok:
             ctx2.add_class("notice-info")
             self.auth_lbl.set_text(
-                "🔑 Helper installed: A password prompt will appear when you apply a new limit."
+                "🔑 System Helper Active: A password prompt will appear when applying new limits."
             )
         else:
             ctx2.add_class("notice-warning")
@@ -449,24 +966,30 @@ class BatteryLimiterApp(Gtk.Window):
                 "⚠️ First-time setup: Run 'sudo ./install.sh' in terminal to enable passwordless control."
             )
 
+        # Explanatory tip for current target
+        self._update_hardware_tip(self.selected_target)
+
         return True
 
-    # ── Event handlers ────────────────────────────────────────────────────────
+    # ── Selection & Event Handlers ────────────────────────────────────────────
 
-    def _on_preset(self, _btn, val):
-        if self.scale:
-            self.scale.set_value(val)
+    def _on_preset_click(self, _btn, val):
+        self.scale.set_value(val)
         self._update_selection(val)
 
-    def _on_scale(self, scale):
+    def _on_pill_click(self, _btn, val):
+        self.scale.set_value(val)
+        self._update_selection(val)
+
+    def _on_scale_change(self, scale):
         val = int(scale.get_value())
         self._update_selection(val)
 
     def _update_selection(self, val):
         self.selected_target = val
-        if hasattr(self, "slider_lbl") and self.slider_lbl:
-            self.slider_lbl.set_text(f"{val}%")
+        self.slider_lbl.set_text(f"{val}%")
 
+        # Highlight preset card
         closest_preset = None
         min_diff = 999
         for pval in self.preset_widgets.keys():
@@ -482,6 +1005,43 @@ class BatteryLimiterApp(Gtk.Window):
             else:
                 ctx.remove_class("preset-card-selected")
 
+        # Highlight pill buttons
+        for pval, pbtn in self.pill_buttons.items():
+            ctx = pbtn.get_style_context()
+            if pval == val:
+                ctx.add_class("btn-pill-active")
+            else:
+                ctx.remove_class("btn-pill-active")
+
+        self._update_hardware_tip(val)
+
+    def _update_hardware_tip(self, val):
+        interface = self.info.get("interface", {})
+        itype = interface.get("type", "")
+
+        if itype == "conservation_mode":
+            if val <= 80:
+                self.hw_tip_lbl.set_text(
+                    f"💡 Target: {val}%. Lenovo Conservation Mode will be ACTIVATED. "
+                    "Your laptop embedded controller (EC) will regulate charge to stay at ~55-60%."
+                )
+            else:
+                self.hw_tip_lbl.set_text(
+                    f"💡 Target: {val}%. Lenovo Conservation Mode will be DISABLED. "
+                    "Battery will charge to full 100% capacity."
+                )
+        elif itype == "percentage":
+            self.hw_tip_lbl.set_text(
+                f"💡 Target: {val}%. Hardware charge threshold will stop AC charging exactly at {val}%."
+            )
+        elif itype == "lg_care" or itype == "samsung_extender":
+            if val <= 80:
+                self.hw_tip_lbl.set_text(f"💡 Target: {val}%. Hardware battery protection enabled (80% max).")
+            else:
+                self.hw_tip_lbl.set_text(f"💡 Target: {val}%. Full 100% charging enabled.")
+        else:
+            self.hw_tip_lbl.set_text(f"💡 Target limit: {val}%.")
+
     def _do_desktop_shortcut(self):
         ok, path = create_desktop_shortcut()
         if ok:
@@ -492,17 +1052,17 @@ class BatteryLimiterApp(Gtk.Window):
     def _on_apply(self, _btn):
         target = self.selected_target
         self.apply_btn.set_sensitive(False)
-        self.apply_btn.set_label("Applying…")
+        self.apply_btn.set_label("⚡ Applying Limit…")
 
         success, msg = self._apply_limit(target)
         self._show_result(msg, success)
 
         self.apply_btn.set_sensitive(True)
-        self.apply_btn.set_label("Apply Limit & Save (Persists on Reboot)")
+        self.apply_btn.set_label("⚡ Apply Limit & Save (Persists on Reboot)")
         GLib.timeout_add(800, self.refresh_status)
 
     def _apply_limit(self, target):
-        """Try root helper (pkexec) -> direct write -> pkexec python -> terminal sudo."""
+        """Attempts application via root helper (pkexec) -> direct write -> pkexec python -> terminal sudo."""
         info = battery_limiter_backend.get_battery_info()
 
         # 1. Root helper via pkexec
@@ -511,11 +1071,11 @@ class BatteryLimiterApp(Gtk.Window):
             if result[0] or result[1] == "Authentication cancelled.":
                 return result
 
-        # 2. Direct write if already root
+        # 2. Direct write if running as root
         if info.get("is_root"):
             return battery_limiter_backend.apply_limit(target)
 
-        # 3. Direct write if plugdev udev rule is active
+        # 3. Direct write if udev plugdev rule is active
         if info.get("can_write_direct"):
             ok, msg = battery_limiter_backend.apply_limit(target)
             if ok:

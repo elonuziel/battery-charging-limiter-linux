@@ -128,13 +128,14 @@ def detect_control_interface():
             "type": "conservation_mode",
             "driver_name": "Lenovo IdeaPad ACPI (conservation_mode)",
             "paths": lenovo_paths,
-            "supports_slider": False,
-            "min_limit": 60,
+            "supports_slider": True,
+            "min_limit": 50,
             "max_limit": 100,
-            "step": 20,
+            "step": 5,
             "presets": [
-                {"value": 80, "label": "🌿 Conservation Mode (~60-80%)", "desc": "Recommended. Hardware caps charge to protect battery chemistry when plugged in."},
-                {"value": 100, "label": "✈️ Full Capacity (100%)", "desc": "Disables conservation mode. Fully charges battery to 100% for travel."},
+                {"value": 60, "label": "🌿 Maximum Lifespan (60%)", "desc": "Enables Lenovo Conservation Mode. Hardware regulates charge to ~55-60% to maximize lifespan while plugged in."},
+                {"value": 80, "label": "⚖️ Daily Balance (80%)", "desc": "Maintains battery conservation mode for daily desk & mixed mobility use."},
+                {"value": 100, "label": "✈️ Full Capacity (100%)", "desc": "Disables conservation mode. Charges battery to 100% capacity for travel and long off-grid work."},
             ],
         }
 
@@ -267,8 +268,8 @@ def get_current_threshold_and_status(interface_info):
 
     elif itype == "conservation_mode":
         is_active = (raw_val == "1")
-        thresh = 80 if is_active else 100
-        display = "Conservation Mode (~60-80%)" if is_active else "Full Capacity (100%)"
+        thresh = 60 if is_active else 100
+        display = "🌿 Conservation Mode (~60%) [Active]" if is_active else "✈️ Full Capacity (100%)"
         return thresh, display, is_active
 
     elif itype == "lg_care":

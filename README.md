@@ -56,6 +56,7 @@ python3 battery_limiter_gui.py
 - 🔍 **Live Hardware Detection**: Displays your laptop model (e.g., *Lenovo ThinkBook 15 G2 ITL*), battery model, and active kernel driver interface.
 - 📊 **Real-Time Battery Stats**: Live battery percentage, charging state, AC power connection, and cycle count.
 - 🎛️ **Adaptive Control Cards**: Automatically tailors controls to your hardware (presets for Lenovo Conservation Mode vs. granular sliders for ASUS/ThinkPad/Dell).
+- 🌓 **Dark & Light Themes**: Instant one-click toggle between crisp dark and clean light modes, saved automatically to your preferences.
 - 🔄 **Reboot Persistence**: Automatically sets up systemd service so your chosen limit survives reboots, sleep, and hibernations.
 - 📌 **One-Click Desktop Icon**: Add a shortcut to your desktop with one click.
 

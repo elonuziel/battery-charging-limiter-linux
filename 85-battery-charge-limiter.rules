@@ -4,34 +4,27 @@
 
 # 1. Standard Linux power_supply charge thresholds (ASUS, ThinkPad, Dell, Framework, System76, MSI, Toshiba)
 SUBSYSTEM=="power_supply", ATTR{type}=="Battery", \
-  RUN+="/bin/chmod g+w /sys%p/charge_control_end_threshold /sys%p/charge_control_start_threshold /sys%p/charge_stop_threshold /sys%p/charge_start_threshold /sys%p/charge_control_limit_max", \
-  RUN+="/bin/chgrp plugdev /sys%p/charge_control_end_threshold /sys%p/charge_control_start_threshold /sys%p/charge_stop_threshold /sys%p/charge_start_threshold /sys%p/charge_control_limit_max"
+  RUN+="/bin/sh -c 'for f in /sys$$devpath/charge_control_end_threshold /sys$$devpath/charge_control_start_threshold /sys$$devpath/charge_stop_threshold /sys$$devpath/charge_start_threshold /sys$$devpath/charge_control_limit_max; do [ -e \"\$\$f\" ] && chmod g+w \"\$\$f\" && chgrp plugdev \"\$\$f\" || true; done'"
 
 # 2. Lenovo IdeaPad / ThinkBook / Yoga / Legion / Xiaoxin (ideapad_laptop / ideapad_acpi)
 SUBSYSTEM=="platform", KERNEL=="VPC2004*", \
-  RUN+="/bin/chmod g+w /sys%p/conservation_mode", \
-  RUN+="/bin/chgrp plugdev /sys%p/conservation_mode"
+  RUN+="/bin/sh -c '[ -e /sys$$devpath/conservation_mode ] && chmod g+w /sys$$devpath/conservation_mode && chgrp plugdev /sys$$devpath/conservation_mode || true'"
 
 SUBSYSTEM=="platform", DRIVER=="ideapad_acpi", \
-  RUN+="/bin/chmod g+w /sys%p/conservation_mode", \
-  RUN+="/bin/chgrp plugdev /sys%p/conservation_mode"
+  RUN+="/bin/sh -c '[ -e /sys$$devpath/conservation_mode ] && chmod g+w /sys$$devpath/conservation_mode && chgrp plugdev /sys$$devpath/conservation_mode || true'"
 
 # 3. LG Gram (lg_laptop)
 SUBSYSTEM=="platform", KERNEL=="lg-laptop", \
-  RUN+="/bin/chmod g+w /sys%p/battery_care_limit", \
-  RUN+="/bin/chgrp plugdev /sys%p/battery_care_limit"
+  RUN+="/bin/sh -c '[ -e /sys$$devpath/battery_care_limit ] && chmod g+w /sys$$devpath/battery_care_limit && chgrp plugdev /sys$$devpath/battery_care_limit || true'"
 
 # 4. Samsung Laptops (samsung-laptop / samsung-galaxybook)
 SUBSYSTEM=="platform", KERNEL=="samsung*", \
-  RUN+="/bin/chmod g+w /sys%p/battery_life_extender", \
-  RUN+="/bin/chgrp plugdev /sys%p/battery_life_extender"
+  RUN+="/bin/sh -c '[ -e /sys$$devpath/battery_life_extender ] && chmod g+w /sys$$devpath/battery_life_extender && chgrp plugdev /sys$$devpath/battery_life_extender || true'"
 
 # 5. Sony Vaio (sony-laptop)
 SUBSYSTEM=="platform", KERNEL=="sony-laptop", \
-  RUN+="/bin/chmod g+w /sys%p/battery_care_limiter", \
-  RUN+="/bin/chgrp plugdev /sys%p/battery_care_limiter"
+  RUN+="/bin/sh -c '[ -e /sys$$devpath/battery_care_limiter ] && chmod g+w /sys$$devpath/battery_care_limiter && chgrp plugdev /sys$$devpath/battery_care_limiter || true'"
 
 # 6. Huawei MateBook (huawei-wmi)
 SUBSYSTEM=="platform", KERNEL=="huawei-wmi", \
-  RUN+="/bin/chmod g+w /sys%p/charge_thresholds", \
-  RUN+="/bin/chgrp plugdev /sys%p/charge_thresholds"
+  RUN+="/bin/sh -c '[ -e /sys$$devpath/charge_thresholds ] && chmod g+w /sys$$devpath/charge_thresholds && chgrp plugdev /sys$$devpath/charge_thresholds || true'"
