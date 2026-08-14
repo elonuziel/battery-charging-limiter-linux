@@ -21,7 +21,7 @@ This tool features **automatic hardware detection** across major laptop manufact
 
 | Manufacturer & Series | Driver Interface | Threshold Modes |
 | :--- | :--- | :--- |
-| **Lenovo ThinkBook, IdeaPad, Yoga, Legion, Xiaoxin** | `ideapad_laptop` (`conservation_mode`) | 🌿 Conservation Mode (~60-80%) / ✈️ Full (100%) |
+| **Lenovo ThinkBook, IdeaPad, Yoga, Legion, Xiaoxin** | `ideapad_laptop` (`conservation_mode`) | 🌿 Conservation Mode (~55-60%) / ✈️ Full (100%) |
 | **Lenovo ThinkPad** | `thinkpad_acpi` (`charge_control_end_threshold`) | 20% - 100% granular / presets (60%, 80%, 100%) |
 | **ASUS ROG, TUF, ZenBook, VivoBook** | `asus_wmi` (`charge_control_end_threshold`) | 20% - 100% granular / presets (60%, 80%, 100%) |
 | **Dell Laptops** | `dell-laptop` / ACPI battery sysfs | 20% - 100% granular / presets |

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
 Battery Limiter Backend Helper for Linux.
-Universal hardware detection and charge threshold management supporting:
-- ASUS laptops (ROG, TUF, ZenBook, VivoBook via asus_wmi)
-- Lenovo IdeaPad, ThinkBook, Yoga, Legion, Xiaoxin (via ideapad_laptop conservation_mode)
-- Lenovo ThinkPad (via thinkpad_acpi charge_control_end_threshold / charge_stop_threshold)
-- LG Gram (via lg_laptop battery_care_limit)
-- Samsung laptops / Galaxy Book (via samsung_laptop / samsung_galaxybook battery_life_extender)
-- Sony Vaio (via sony_laptop battery_care_limiter)
-- Huawei MateBook (via huawei_wmi charge_thresholds)
+Hardware-accurate detection and charge threshold management supporting:
+- Lenovo IdeaPad, ThinkBook, Yoga, Legion, Xiaoxin (via ideapad_laptop conservation_mode: 60% vs 100%)
+- ASUS laptops (ROG, TUF, ZenBook, VivoBook via asus_wmi: 60%, 80%, 100% or granular)
+- Lenovo ThinkPad (via thinkpad_acpi charge_control_end_threshold)
+- LG Gram (via lg_laptop battery_care_limit: 80% vs 100%)
+- Samsung laptops / Galaxy Book (via samsung_laptop battery_life_extender: 80% vs 100%)
+- Sony Vaio (via sony_laptop battery_care_limiter: 50%, 80%, 100%)
+- Huawei MateBook (via huawei_wmi charge_thresholds: 70%, 80%, 100%)
 - Dell, Framework, System76/Clevo, MSI, Toshiba, Apple Silicon Mac (Linux Kernel 5.4+ sysfs)
 """
 
@@ -87,7 +87,7 @@ def find_battery_devices():
 def detect_control_interface():
     """
     Detects the active battery charge limiting interface on this machine.
-    Returns a dictionary describing the interface type, driver name, file paths, and capabilities.
+    Returns a dictionary describing the interface type, driver name, file paths, and genuine hardware capabilities.
     """
     bat_devices = find_battery_devices()
 
@@ -108,10 +108,26 @@ def detect_control_interface():
             "min_limit": 20,
             "max_limit": 100,
             "step": 5,
+            "hardware_note": "Your laptop hardware supports continuous integer charge threshold percentages.",
             "presets": [
-                {"value": 60, "label": "🌿 Maximum Lifespan (60%)", "desc": "Ideal for always-plugged-in desk work. Minimises voltage stress and heat."},
-                {"value": 80, "label": "⚖️ Daily Balance (80%)", "desc": "Recommended. Best mix of longevity and enough capacity for mobile use."},
-                {"value": 100, "label": "✈️ Full Capacity (100%)", "desc": "For travel, long flights, or extended off-grid work."},
+                {
+                    "value": 60,
+                    "label": "🌿 Maximum Lifespan (60%)",
+                    "badge": "DESK USE",
+                    "desc": "Recommended for always-plugged-in desk work. Keeps battery at 60% to minimize cell voltage stress & heat build-up."
+                },
+                {
+                    "value": 80,
+                    "label": "⚖️ Daily Balance (80%)",
+                    "badge": "RECOMMENDED",
+                    "desc": "Recommended for daily mixed use. Balances chemical longevity with sufficient mobile battery run-time."
+                },
+                {
+                    "value": 100,
+                    "label": "✈️ Full Capacity (100%)",
+                    "badge": "FULL CHARGE",
+                    "desc": "For travel, flights, or long off-grid work. Charges battery to full 100% capacity."
+                },
             ],
         }
 
@@ -128,14 +144,24 @@ def detect_control_interface():
             "type": "conservation_mode",
             "driver_name": "Lenovo IdeaPad ACPI (conservation_mode)",
             "paths": lenovo_paths,
-            "supports_slider": True,
-            "min_limit": 50,
+            "supports_slider": False,
+            "min_limit": 60,
             "max_limit": 100,
-            "step": 5,
+            "step": 40,
+            "hardware_note": "Your Lenovo ThinkBook uses Embedded Controller (EC) Conservation Mode. The firmware physically supports two hardware states: Conservation Mode (~55-60%) and Full Charge (100%).",
             "presets": [
-                {"value": 60, "label": "🌿 Maximum Lifespan (60%)", "desc": "Enables Lenovo Conservation Mode. Hardware regulates charge to ~55-60% to maximize lifespan while plugged in."},
-                {"value": 80, "label": "⚖️ Daily Balance (80%)", "desc": "Maintains battery conservation mode for daily desk & mixed mobility use."},
-                {"value": 100, "label": "✈️ Full Capacity (100%)", "desc": "Disables conservation mode. Charges battery to 100% capacity for travel and long off-grid work."},
+                {
+                    "value": 60,
+                    "label": "🌿 Conservation Mode (~60%)",
+                    "badge": "MAX LIFESPAN",
+                    "desc": "Activates Lenovo Conservation Mode. Embedded Controller hardware automatically regulates charge between ~55% and ~60% to prevent chemical wear while plugged into AC power."
+                },
+                {
+                    "value": 100,
+                    "label": "✈️ Full Capacity (100%)",
+                    "badge": "FULL MOBILITY",
+                    "desc": "Disables conservation mode. Battery charges to full 100% capacity for travel, flights, and extended mobile off-grid work."
+                },
             ],
         }
 
@@ -155,9 +181,10 @@ def detect_control_interface():
             "min_limit": 80,
             "max_limit": 100,
             "step": 20,
+            "hardware_note": "LG Gram hardware provides two modes: Battery Care (80%) and Full Charge (100%).",
             "presets": [
-                {"value": 80, "label": "🌿 Battery Care (80%)", "desc": "Caps charge at 80% to prolong battery lifespan."},
-                {"value": 100, "label": "✈️ Full Capacity (100%)", "desc": "Charges battery to full 100% capacity."},
+                {"value": 80, "label": "🌿 Battery Care (80%)", "badge": "BATTERY CARE", "desc": "Caps charge at 80% to prolong battery lifespan."},
+                {"value": 100, "label": "✈️ Full Capacity (100%)", "badge": "FULL CHARGE", "desc": "Charges battery to full 100% capacity."},
             ],
         }
 
@@ -177,9 +204,10 @@ def detect_control_interface():
             "min_limit": 80,
             "max_limit": 100,
             "step": 20,
+            "hardware_note": "Samsung hardware provides two modes: Life Extender (80%) and Full Charge (100%).",
             "presets": [
-                {"value": 80, "label": "🌿 Battery Life Extender (80%)", "desc": "Caps maximum charge to 80% to protect battery health."},
-                {"value": 100, "label": "✈️ Full Capacity (100%)", "desc": "Charges to 100% capacity."},
+                {"value": 80, "label": "🌿 Battery Life Extender (80%)", "badge": "EXTENDER", "desc": "Caps maximum charge to 80% to protect battery health."},
+                {"value": 100, "label": "✈️ Full Capacity (100%)", "badge": "FULL CHARGE", "desc": "Charges to 100% capacity."},
             ],
         }
 
@@ -198,10 +226,11 @@ def detect_control_interface():
             "min_limit": 50,
             "max_limit": 100,
             "step": 30,
+            "hardware_note": "Sony Vaio hardware provides three modes: 50%, 80%, and Full 100%.",
             "presets": [
-                {"value": 50, "label": "🌿 Maximum Lifespan (50%)", "desc": "Maximum preservation for continuous AC desk use."},
-                {"value": 80, "label": "⚖️ Daily Balance (80%)", "desc": "Recommended balance for mobile and desk usage."},
-                {"value": 100, "label": "✈️ Full Capacity (100%)", "desc": "Full 100% capacity."},
+                {"value": 50, "label": "🌿 Maximum Lifespan (50%)", "badge": "50% CAP", "desc": "Maximum preservation for continuous AC desk use."},
+                {"value": 80, "label": "⚖️ Daily Balance (80%)", "badge": "80% CAP", "desc": "Recommended balance for mobile and desk usage."},
+                {"value": 100, "label": "✈️ Full Capacity (100%)", "badge": "100% FULL", "desc": "Full 100% capacity."},
             ],
         }
 
@@ -221,10 +250,11 @@ def detect_control_interface():
             "min_limit": 70,
             "max_limit": 100,
             "step": 10,
+            "hardware_note": "Huawei MateBook provides Home (70%), Work (80%), and Travel (100%) modes.",
             "presets": [
-                {"value": 70, "label": "🌿 Home Mode (40-70%)", "desc": "Best for prolonged AC charger connection at home."},
-                {"value": 80, "label": "⚖️ Work Mode (70-80%)", "desc": "Balanced protection for office and meetings."},
-                {"value": 100, "label": "✈️ Travel Mode (95-100%)", "desc": "Full capacity for travel."},
+                {"value": 70, "label": "🌿 Home Mode (40-70%)", "badge": "HOME", "desc": "Best for prolonged AC charger connection at home."},
+                {"value": 80, "label": "⚖️ Work Mode (70-80%)", "badge": "WORK", "desc": "Balanced protection for office and meetings."},
+                {"value": 100, "label": "✈️ Travel Mode (95-100%)", "badge": "TRAVEL", "desc": "Full capacity for travel."},
             ],
         }
 
@@ -236,6 +266,7 @@ def detect_control_interface():
         "min_limit": 100,
         "max_limit": 100,
         "step": 1,
+        "hardware_note": "No hardware battery limit interface was detected on this device.",
         "presets": [],
     }
 
@@ -269,25 +300,25 @@ def get_current_threshold_and_status(interface_info):
     elif itype == "conservation_mode":
         is_active = (raw_val == "1")
         thresh = 60 if is_active else 100
-        display = "🌿 Conservation Mode (~60%) [Active]" if is_active else "✈️ Full Capacity (100%)"
+        display = "🌿 Conservation Mode (~60%)" if is_active else "✈️ Full Capacity (100%)"
         return thresh, display, is_active
 
     elif itype == "lg_care":
         is_active = (raw_val == "80")
         thresh = 80 if is_active else 100
-        display = "Battery Care (80%)" if is_active else "Full Capacity (100%)"
+        display = "🌿 Battery Care (80%)" if is_active else "✈️ Full Capacity (100%)"
         return thresh, display, is_active
 
     elif itype == "samsung_extender":
         is_active = (raw_val == "1")
         thresh = 80 if is_active else 100
-        display = "Life Extender (80%)" if is_active else "Full Capacity (100%)"
+        display = "🌿 Life Extender (80%)" if is_active else "✈️ Full Capacity (100%)"
         return thresh, display, is_active
 
     elif itype == "sony_care":
         val = read_int(primary_path)
         thresh = 100 if val == 0 else (val if val else 100)
-        display = f"Battery Care ({thresh}%)" if thresh < 100 else "Full Capacity (100%)"
+        display = f"🌿 Battery Care ({thresh}%)" if thresh < 100 else "✈️ Full Capacity (100%)"
         return thresh, display, (thresh < 100)
 
     elif itype == "huawei":
@@ -423,7 +454,7 @@ def apply_limit_direct(limit):
         _write_systemd_service(limit, itype)
 
     if itype == "conservation_mode":
-        state_str = "Enabled (~60-80% capacity)" if limit <= 80 else "Disabled (100% full capacity)"
+        state_str = "Enabled (~55-60% capacity cap)" if limit <= 80 else "Disabled (100% full capacity)"
         return True, f"Successfully updated Lenovo Conservation Mode: {state_str}!"
     else:
         return True, f"Successfully set charge limit to {limit}%! ({', '.join(written)})"
@@ -490,6 +521,7 @@ def print_diagnostic_report():
     print(f" 🏷️ Interface:     {interface.get('type')}")
     print(f" 📁 Sysfs Paths:   {', '.join(interface.get('paths', [])) or 'None'}")
     print(f" 🎯 Current Limit: {info.get('threshold_display')}")
+    print(f" ℹ️ Capability:    {interface.get('hardware_note')}")
     print(f" 🔄 Persistence:   {'Enabled (systemd)' if info.get('service_enabled') else 'Not active'}")
     print(f" ✍️ Direct Access: {'Yes (plugdev / root)' if info.get('can_write_direct') or info.get('is_root') else 'Requires pkexec / sudo'}")
     print("══════════════════════════════════════════════════════════════")

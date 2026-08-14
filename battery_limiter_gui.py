@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
 Battery Charge Limiter GUI for Linux (GTK 3).
-A modern, beautiful, and intuitive battery threshold manager with:
-- Instant UI synchronization across live battery status, target profiles, and percentages
-- Dark and Light theme support with instant toggle & persistence
-- Universal support for Lenovo, ASUS, Dell, LG Gram, Samsung, Huawei, Framework, System76, Sony, MSI, Apple Silicon
+Hardware-accurate battery threshold manager supporting:
+- Lenovo ThinkBook / IdeaPad / Yoga / Legion (Genuine Conservation Mode 60% vs 100%)
+- ASUS ROG / TUF / ZenBook / VivoBook (Granular 60%, 80%, 100% and slider)
+- Lenovo ThinkPad, Dell, Framework, System76, LG Gram, Samsung, Sony, Huawei, MSI, Apple Silicon
 """
 
 import sys
@@ -615,7 +615,7 @@ def create_desktop_shortcut():
 class BatteryLimiterApp(Gtk.Window):
     def __init__(self):
         super().__init__(title="Battery Charge Limiter")
-        self.set_default_size(560, 840)
+        self.set_default_size(560, 780)
         self.set_resizable(False)
         self.set_position(Gtk.WindowPosition.CENTER)
         self.get_style_context().add_class("main-window")
@@ -791,9 +791,8 @@ class BatteryLimiterApp(Gtk.Window):
         self.thresh_lbl = stat_col("ACTIVE LIMIT", row=0, col=1)
         self.status_lbl = stat_col("POWER STATE", row=0, col=2)
 
-        # Selected Target Profile live readout
         self.target_profile_lbl = stat_col("TARGET SELECTION", row=2, col=1)
-        self.health_mode_lbl = stat_col("CONSERVATION STATE", row=2, col=2)
+        self.health_mode_lbl = stat_col("HARDWARE PROFILE", row=2, col=2)
 
         status_card.pack_start(grid, False, False, 0)
 
@@ -805,9 +804,9 @@ class BatteryLimiterApp(Gtk.Window):
 
         root.pack_start(status_card, False, False, 0)
 
-        # ── 4. Target Threshold Presets ──────────────────────────────────────
+        # ── 4. Supported Hardware Modes ──────────────────────────────────────
         choose_hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        choose_lbl = Gtk.Label(label="Choose Your Battery Profile", xalign=0)
+        choose_lbl = Gtk.Label(label="Supported Charging Profiles", xalign=0)
         choose_lbl.get_style_context().add_class("section-heading")
         self.target_badge = Gtk.Label(label=f"🎯 Target: {self.selected_target}%", xalign=1)
         self.target_badge.get_style_context().add_class("badge")
@@ -817,17 +816,21 @@ class BatteryLimiterApp(Gtk.Window):
         choose_hdr.pack_end(self.target_badge, False, False, 0)
         root.pack_start(choose_hdr, False, False, 0)
 
-        presets = [
-            (60, "🌿 Maximum Lifespan (60%)",
-             "Recommended for continuous AC power / desk work. Minimizes battery voltage stress & heat build-up."),
-            (80, "⚖️ Daily Balance (80%)",
-             "Recommended for daily mixed use. Balances chemical longevity with sufficient mobile battery run-time."),
-            (100, "✈️ Full Capacity (100%)",
-             "For travel, flights, or long off-grid work. Charges battery to full 100% capacity."),
-        ]
+        interface = self.info.get("interface", {})
+        presets = interface.get("presets", [])
+        if not presets:
+            presets = [
+                {"value": 60, "label": "🌿 Maximum Lifespan (60%)", "badge": "60% CAP", "desc": "Caps charge at 60% to maximize lifespan while plugged in."},
+                {"value": 100, "label": "✈️ Full Capacity (100%)", "badge": "100% FULL", "desc": "Charges battery to full 100% capacity."},
+            ]
 
         self.presets_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        for val, title, desc in presets:
+        for p in presets:
+            val = p["value"]
+            title = p["label"]
+            desc = p["desc"]
+            badge_text = p.get("badge", "")
+
             btn = Gtk.Button()
             btn.get_style_context().add_class("preset-card")
             inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
@@ -835,7 +838,7 @@ class BatteryLimiterApp(Gtk.Window):
             top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
             t = Gtk.Label(label=title, xalign=0)
             t.get_style_context().add_class("preset-title")
-            badge_lbl = Gtk.Label(label="", xalign=1)
+            badge_lbl = Gtk.Label(label=badge_text, xalign=1)
             badge_lbl.get_style_context().add_class("preset-badge-lbl")
             top_row.pack_start(t, True, True, 0)
             top_row.pack_end(badge_lbl, False, False, 0)
@@ -854,47 +857,57 @@ class BatteryLimiterApp(Gtk.Window):
 
         root.pack_start(self.presets_box, False, False, 0)
 
-        # ── 5. Fine Slider & Quick Select Pills ──────────────────────────────
-        slider_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        slider_card.get_style_context().add_class("card")
+        # ── 5. Fine Slider & Quick Select (Only if hardware supports granular slider) ─
+        if interface.get("supports_slider", False):
+            slider_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+            slider_card.get_style_context().add_class("card")
 
-        slider_hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        slider_title = Gtk.Label(label="Precision Target Slider", xalign=0)
-        slider_title.get_style_context().add_class("section-heading")
-        self.slider_lbl = Gtk.Label(label=f"{self.selected_target}%", xalign=1)
-        self.slider_lbl.get_style_context().add_class("slider-val-label")
-        slider_hdr.pack_start(slider_title, True, True, 0)
-        slider_hdr.pack_end(self.slider_lbl, False, False, 0)
-        slider_card.pack_start(slider_hdr, False, False, 0)
+            slider_hdr = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+            slider_title = Gtk.Label(label="Granular Threshold Slider", xalign=0)
+            slider_title.get_style_context().add_class("section-heading")
+            self.slider_lbl = Gtk.Label(label=f"{self.selected_target}%", xalign=1)
+            self.slider_lbl.get_style_context().add_class("slider-val-label")
+            slider_hdr.pack_start(slider_title, True, True, 0)
+            slider_hdr.pack_end(self.slider_lbl, False, False, 0)
+            slider_card.pack_start(slider_hdr, False, False, 0)
 
-        # Quick select pill buttons
-        pills_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        pills_box.set_homogeneous(True)
-        for pval in [50, 60, 70, 80, 90, 100]:
-            pbtn = Gtk.Button(label=f"{pval}%")
-            pbtn.get_style_context().add_class("btn-pill")
-            pbtn.connect("clicked", self._on_pill_click, pval)
-            pills_box.pack_start(pbtn, True, True, 0)
-            self.pill_buttons[pval] = pbtn
-        slider_card.pack_start(pills_box, False, False, 0)
+            # Quick select pill buttons
+            pills_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            pills_box.set_homogeneous(True)
+            for pval in [50, 60, 70, 80, 90, 100]:
+                pbtn = Gtk.Button(label=f"{pval}%")
+                pbtn.get_style_context().add_class("btn-pill")
+                pbtn.connect("clicked", self._on_pill_click, pval)
+                pills_box.pack_start(pbtn, True, True, 0)
+                self.pill_buttons[pval] = pbtn
+            slider_card.pack_start(pills_box, False, False, 0)
 
-        # Continuous scale
-        self.scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 50, 100, 5)
-        self.scale.set_value(self.selected_target)
-        self.scale.set_draw_value(False)
-        self.scale.connect("value-changed", self._on_scale_change)
-        slider_card.pack_start(self.scale, False, False, 0)
+            # Continuous scale
+            min_l = interface.get("min_limit", 50)
+            max_l = interface.get("max_limit", 100)
+            step = interface.get("step", 5)
+            self.scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, min_l, max_l, step)
+            self.scale.set_value(self.selected_target)
+            self.scale.set_draw_value(False)
+            self.scale.connect("value-changed", self._on_scale_change)
+            slider_card.pack_start(self.scale, False, False, 0)
 
-        # Hardware explanatory tip
-        self.hw_tip_lbl = Gtk.Label(label="", xalign=0)
+            root.pack_start(slider_card, False, False, 0)
+
+        # Hardware explanation card
+        hw_info_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        hw_info_card.get_style_context().add_class("hardware-card")
+        hw_note_title = Gtk.Label(label="ℹ️ Hardware Capability Note", xalign=0)
+        hw_note_title.get_style_context().add_class("hw-label")
+        self.hw_tip_lbl = Gtk.Label(label=interface.get("hardware_note", ""), xalign=0)
         self.hw_tip_lbl.get_style_context().add_class("info-tip")
         self.hw_tip_lbl.set_line_wrap(True)
-        slider_card.pack_start(self.hw_tip_lbl, False, False, 0)
-
-        root.pack_start(slider_card, False, False, 0)
+        hw_info_card.pack_start(hw_note_title, False, False, 0)
+        hw_info_card.pack_start(self.hw_tip_lbl, False, False, 0)
+        root.pack_start(hw_info_card, False, False, 0)
 
         # ── 6. Apply Button ──────────────────────────────────────────────────
-        self.apply_btn = Gtk.Button(label=f"⚡ Apply {self.selected_target}% Limit & Save (Persists on Reboot)")
+        self.apply_btn = Gtk.Button(label=f"⚡ Apply Limit & Save (Persists on Reboot)")
         self.apply_btn.get_style_context().add_class("btn-primary")
         self.apply_btn.connect("clicked", self._on_apply)
         root.pack_start(self.apply_btn, False, False, 0)
@@ -976,12 +989,12 @@ class BatteryLimiterApp(Gtk.Window):
         if cap is not None:
             self.level_bar.set_value(cap / 100.0)
 
-        # Conservation state readout
+        # Hardware profile readout
         if driver_type == "conservation_mode":
             if is_conservation_active:
-                self.health_mode_lbl.set_text("Active (55-60% Cap)")
+                self.health_mode_lbl.set_text("Conservation (55-60% Cap)")
             else:
-                self.health_mode_lbl.set_text("Disabled (100% Full)")
+                self.health_mode_lbl.set_text("Full Charge (100%)")
         elif driver_type == "percentage":
             self.health_mode_lbl.set_text(f"{thresh_display} Threshold")
         else:
@@ -1005,7 +1018,7 @@ class BatteryLimiterApp(Gtk.Window):
         if is_root or can_write:
             ctx2.add_class("notice-success")
             self.auth_lbl.set_text(
-                "✅ Direct Access: Settings will apply immediately without prompt."
+                "✅ Direct Access: Settings apply immediately without password prompt."
             )
         elif helper_ok:
             ctx2.add_class("notice-info")
@@ -1018,23 +1031,22 @@ class BatteryLimiterApp(Gtk.Window):
                 "⚠️ First-time setup: Run 'sudo ./install.sh' in terminal to enable passwordless control."
             )
 
-        # Update target profile label & hardware tip
-        self._update_hardware_tip(self.selected_target)
-
         return True
 
     # ── Selection & Event Handlers ────────────────────────────────────────────
 
     def _on_preset_click(self, _btn, val):
-        self._updating_scale = True
-        self.scale.set_value(val)
-        self._updating_scale = False
+        if hasattr(self, "scale") and self.scale:
+            self._updating_scale = True
+            self.scale.set_value(val)
+            self._updating_scale = False
         self._update_selection(val)
 
     def _on_pill_click(self, _btn, val):
-        self._updating_scale = True
-        self.scale.set_value(val)
-        self._updating_scale = False
+        if hasattr(self, "scale") and self.scale:
+            self._updating_scale = True
+            self.scale.set_value(val)
+            self._updating_scale = False
         self._update_selection(val)
 
     def _on_scale_change(self, scale):
@@ -1045,82 +1057,66 @@ class BatteryLimiterApp(Gtk.Window):
 
     def _update_selection(self, val):
         self.selected_target = val
-        self.slider_lbl.set_text(f"{val}%")
+        interface = self.info.get("interface", {})
+        itype = interface.get("type", "")
+
+        if hasattr(self, "slider_lbl") and self.slider_lbl:
+            self.slider_lbl.set_text(f"{val}%")
 
         # Update target badge in header
         if hasattr(self, "target_badge"):
-            self.target_badge.set_text(f"🎯 Target: {val}%")
+            if itype == "conservation_mode":
+                label_text = "🌿 Conservation (~60%)" if val <= 80 else "✈️ Full (100%)"
+                self.target_badge.set_text(f"🎯 Target: {label_text}")
+            else:
+                self.target_badge.set_text(f"🎯 Target: {val}%")
 
         # Update target profile live label in stats grid
         if hasattr(self, "target_profile_lbl"):
-            if val <= 60:
-                self.target_profile_lbl.set_text(f"🌿 Lifespan ({val}%)")
-            elif val <= 85:
-                self.target_profile_lbl.set_text(f"⚖️ Daily ({val}%)")
+            if itype == "conservation_mode":
+                self.target_profile_lbl.set_text("🌿 Conservation (~60%)" if val <= 80 else "✈️ Full Charge (100%)")
             else:
-                self.target_profile_lbl.set_text(f"✈️ Full ({val}%)")
+                if val <= 60:
+                    self.target_profile_lbl.set_text(f"🌿 Lifespan ({val}%)")
+                elif val <= 85:
+                    self.target_profile_lbl.set_text(f"⚖️ Daily ({val}%)")
+                else:
+                    self.target_profile_lbl.set_text(f"✈️ Full ({val}%)")
 
         # Update Apply button label
         if hasattr(self, "apply_btn"):
-            self.apply_btn.set_label(f"⚡ Apply {val}% Limit & Save (Persists on Reboot)")
+            if itype == "conservation_mode":
+                btn_name = "Conservation Mode (~60%)" if val <= 80 else "Full Capacity (100%)"
+                self.apply_btn.set_label(f"⚡ Apply {btn_name} & Save (Persists on Reboot)")
+            else:
+                self.apply_btn.set_label(f"⚡ Apply {val}% Limit & Save (Persists on Reboot)")
 
-        # Highlight preset card
-        closest_preset = None
-        min_diff = 999
-        for pval in self.preset_widgets.keys():
-            diff = abs(pval - val)
-            if diff < min_diff:
-                min_diff = diff
-                closest_preset = pval
-
+        # Highlight preset cards
         for pval, btn in self.preset_widgets.items():
             ctx = btn.get_style_context()
             badge_lbl = self.preset_badge_labels.get(pval)
-            if pval == val or (min_diff <= 10 and pval == closest_preset):
+            is_match = (pval == val) or (itype == "conservation_mode" and ((val <= 80 and pval == 60) or (val > 80 and pval == 100)))
+            if is_match:
                 ctx.add_class("preset-card-selected")
                 if badge_lbl:
                     badge_lbl.set_text("✓ SELECTED")
             else:
                 ctx.remove_class("preset-card-selected")
+                orig_badge = ""
+                for p in interface.get("presets", []):
+                    if p["value"] == pval:
+                        orig_badge = p.get("badge", "")
+                        break
                 if badge_lbl:
-                    badge_lbl.set_text("")
+                    badge_lbl.set_text(orig_badge)
 
-        # Highlight pill buttons
+        # Highlight pill buttons (if present)
         for pval, pbtn in self.pill_buttons.items():
             ctx = pbtn.get_style_context()
             if pval == val:
                 ctx.add_class("btn-pill-active")
             else:
                 ctx.remove_class("btn-pill-active")
-
-        self._update_hardware_tip(val)
-
-    def _update_hardware_tip(self, val):
-        interface = self.info.get("interface", {})
-        itype = interface.get("type", "")
-
-        if itype == "conservation_mode":
-            if val <= 80:
-                self.hw_tip_lbl.set_text(
-                    f"💡 Target: {val}%. Lenovo Conservation Mode will be ACTIVATED. "
-                    "Your laptop embedded controller (EC) will regulate charge to stay at ~55-60%."
-                )
-            else:
-                self.hw_tip_lbl.set_text(
-                    f"💡 Target: {val}%. Lenovo Conservation Mode will be DISABLED. "
-                    "Battery will charge to full 100% capacity."
-                )
-        elif itype == "percentage":
-            self.hw_tip_lbl.set_text(
-                f"💡 Target: {val}%. Hardware charge threshold will stop AC charging exactly at {val}%."
-            )
-        elif itype == "lg_care" or itype == "samsung_extender":
-            if val <= 80:
-                self.hw_tip_lbl.set_text(f"💡 Target: {val}%. Hardware battery protection enabled (80% max).")
-            else:
-                self.hw_tip_lbl.set_text(f"💡 Target: {val}%. Full 100% charging enabled.")
-        else:
-            self.hw_tip_lbl.set_text(f"💡 Target limit: {val}%.")
 
     def _do_desktop_shortcut(self):
         ok, path = create_desktop_shortcut()
@@ -1132,7 +1128,7 @@ class BatteryLimiterApp(Gtk.Window):
     def _on_apply(self, _btn):
         target = self.selected_target
         self.apply_btn.set_sensitive(False)
-        self.apply_btn.set_label(f"⚡ Applying {target}% Limit…")
+        self.apply_btn.set_label("⚡ Applying Limit…")
 
         # Process GTK events so UI updates button state immediately
         while Gtk.events_pending():
@@ -1145,7 +1141,7 @@ class BatteryLimiterApp(Gtk.Window):
         self.refresh_status()
 
         self.apply_btn.set_sensitive(True)
-        self.apply_btn.set_label(f"⚡ Apply {target}% Limit & Save (Persists on Reboot)")
+        self._update_selection(self.selected_target)
         GLib.timeout_add(500, self.refresh_status)
 
     def _apply_limit(self, target):
